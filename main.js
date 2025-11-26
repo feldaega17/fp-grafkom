@@ -100,12 +100,96 @@ function createStage() {
     scene.add(stage);
 }
 createStage();
+
 // =========================
-// LOAD MODEL REOG
+// LOAD MODEL REOG + TEXTURE TOGGLE
 // =========================
 
 let reogModel = null;
 let reogBoundingBox = null;
+
+// simpan state material asli GLB
+const texLoader = new THREE.TextureLoader();
+let originalMaterialStateStored = false;
+
+// State untuk siklus tekstur
+// 0: GLB, 1-4: PNG textures
+let currentTextureState = 0;
+const pngDiffuseTextures = [
+    "/texture_diffuse_1.png",
+    "/texture_metallic.png", // Asumsi nama file
+    "/texture_normal_0.png", // Asumsi nama file
+    "/texture_roughness.png", // Asumsi nama file
+];
+
+function storeOriginalMaterialState() {
+    if (!reogModel || originalMaterialStateStored) return;
+
+    reogModel.traverse((child) => {
+        if (child.isMesh && child.material) {
+            // simpan properti penting untuk dikembalikan
+            child.userData._origMaterialProps = {
+                map: child.material.map,
+                normalMap: child.material.normalMap,
+                roughnessMap: child.material.roughnessMap,
+                metalnessMap: child.material.metalnessMap,
+                color: child.material.color.clone(),
+                roughness: child.material.roughness,
+                metalness: child.material.metalness,
+                emissive: child.material.emissive.clone(),
+                emissiveIntensity: child.material.emissiveIntensity,
+            };
+        }
+    });
+
+    originalMaterialStateStored = true;
+}
+
+function applyPNGTextures(index) {
+    if (!reogModel) return;
+    if (index < 0 || index >= pngDiffuseTextures.length) return;
+
+    const diffuse = texLoader.load(pngDiffuseTextures[index]);
+    const roughness = texLoader.load("/texture_roughness.png");
+    const metallic = texLoader.load("/texture_metallic.png");
+    const normal = texLoader.load("/texture_normal_0.png");
+
+    reogModel.traverse((child) => {
+        if (child.isMesh && child.material) {
+            child.material.map = diffuse;
+            child.material.roughnessMap = roughness;
+            child.material.metalnessMap = metallic;
+            child.material.normalMap = normal;
+
+            child.material.needsUpdate = true;
+        }
+    });
+
+    console.log(`✔ PNG texture ${index + 1} applied`);
+}
+
+function restoreGLBTextures() {
+    if (!reogModel) return;
+
+    reogModel.traverse((child) => {
+        if (child.isMesh && child.material && child.userData._origMaterialProps) {
+            const orig = child.userData._origMaterialProps;
+            child.material.map = orig.map;
+            child.material.normalMap = orig.normalMap;
+            child.material.roughnessMap = orig.roughnessMap;
+            child.material.metalnessMap = orig.metalnessMap;
+            child.material.color.copy(orig.color);
+            child.material.roughness = orig.roughness;
+            child.material.metalness = orig.metalness;
+            child.material.emissive.copy(orig.emissive);
+            child.material.emissiveIntensity = orig.emissiveIntensity;
+
+            child.material.needsUpdate = true;
+        }
+    });
+
+    console.log("✔ Restored GLB textures/materials");
+}
 
 const loader = new GLTFLoader();
 loader.load(
@@ -118,7 +202,7 @@ loader.load(
         // Hitung bounding box untuk penentuan region klik
         reogBoundingBox = new THREE.Box3().setFromObject(reogModel);
 
-        // Aktifkan shadow kalau mau
+        // Aktifkan shadow dan simpan emissive asli
         reogModel.traverse((child) => {
             if (child.isMesh) {
                 child.castShadow = true;
@@ -132,6 +216,9 @@ loader.load(
 
         scene.add(reogModel);
         console.log("✔ Reog loaded");
+
+        // simpan material GLB original setelah model masuk scene
+        storeOriginalMaterialState();
     },
     undefined,
     (err) => {
@@ -306,6 +393,44 @@ function createMusicButton(sound) {
 
     document.body.appendChild(btn);
 }
+
+// =========================
+// TOMBOL TOGGLE TEKSTUR PNG / GLB
+// =========================
+
+const texBtn = document.createElement("button");
+texBtn.innerText = "Texture: GLB";
+texBtn.style.position = "absolute";
+texBtn.style.top = "60px";
+texBtn.style.right = "20px";
+texBtn.style.padding = "8px 16px";
+texBtn.style.background = "#0066aa";
+texBtn.style.color = "white";
+texBtn.style.border = "none";
+texBtn.style.borderRadius = "6px";
+texBtn.style.cursor = "pointer";
+texBtn.style.fontSize = "13px";
+texBtn.style.fontWeight = "bold";
+texBtn.style.zIndex = "1000";
+document.body.appendChild(texBtn);
+
+texBtn.onclick = () => {
+    if (!reogModel || !originalMaterialStateStored) return;
+
+    // Siklus dari 0 (GLB) ke 4 (PNG ke-4), lalu kembali ke 0
+    currentTextureState = (currentTextureState + 1) % (pngDiffuseTextures.length + 1);
+
+    if (currentTextureState === 0) {
+        // Kembali ke tekstur GLB asli
+        restoreGLBTextures();
+        texBtn.innerText = "Texture: GLB";
+    } else {
+        // Terapkan tekstur PNG sesuai state
+        const pngIndex = currentTextureState - 1;
+        applyPNGTextures(pngIndex);
+        texBtn.innerText = `Texture: PNG ${currentTextureState}`;
+    }
+};
 
 // =========================
 // RAYCASTING: HOVER & KLIK
