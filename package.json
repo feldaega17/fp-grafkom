@@ -15,5 +15,13 @@
   },
   "devDependencies": {
     "vite": "^7.2.4"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/feldaega17/fp-grafkom.git"
+  },
+  "bugs": {
+    "url": "https://github.com/feldaega17/fp-grafkom/issues"
+  },
+  "homepage": "https://github.com/feldaega17/fp-grafkom#readme"
 }
