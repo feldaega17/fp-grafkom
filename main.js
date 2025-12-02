@@ -1,673 +1,472 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
 
 // =========================
 // SETUP DASAR SCENE
 // =========================
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xcccccc); // Warna abu-abu terang
-scene.fog = new THREE.FogExp2(0xcccccc, 0.08); // Kabut dengan warna yang sama
+
+// Skybox (langit malam Bali)
+const skyColor = new THREE.Color(0x1a1a3e);
+scene.background = skyColor;
+scene.fog = new THREE.FogExp2(0x1a1a3e, 0.008);
 
 // Kamera
 const camera = new THREE.PerspectiveCamera(
-    50,
+    75,
     window.innerWidth / window.innerHeight,
     0.1,
-    100
+    1000
 );
-const defaultCameraPos = new THREE.Vector3(2, 2, 4);
-camera.position.copy(defaultCameraPos);
+camera.position.set(0, 2, 20);
 
 // Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-// Controls Orbit
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.target.set(0, 1, 0);
-controls.update();
+// Pointer Lock Controls untuk FPS-style movement
+const controls = new PointerLockControls(camera, document.body);
 
 // =========================
-// LIGHTING & FX PANGGUNG
+// LIGHTING - SUASANA MALAM NYEPI
 // =========================
 
-// Cahaya lembut umum
-const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
-scene.add(hemi);
+// Ambient light (terang)
+const ambientLight = new THREE.AmbientLight(0x6688bb, 1.2);
+scene.add(ambientLight);
 
-// Spotlight utama (panggung)
-const spot = new THREE.SpotLight(0xffddaa, 3, 30, Math.PI / 6, 0.3);
-spot.position.set(4, 8, 4);
-spot.target.position.set(0, 1, 0);
-scene.add(spot);
-scene.add(spot.target);
+// Hemisphere light
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
+scene.add(hemiLight);
 
-// Lampu panggung kedua (bergerak pelan)
-const movingSpot = new THREE.SpotLight(0xff6666, 1.5, 25, Math.PI / 7, 0.4);
-movingSpot.position.set(-5, 6, -3);
-movingSpot.target.position.set(0, 1, 0);
-scene.add(movingSpot);
-scene.add(movingSpot.target);
+// Moonlight (terang)
+const moonLight = new THREE.DirectionalLight(0xffffff, 1.5);
+moonLight.position.set(50, 100, 50);
+moonLight.castShadow = true;
+moonLight.shadow.mapSize.width = 2048;
+moonLight.shadow.mapSize.height = 2048;
+moonLight.shadow.camera.near = 0.5;
+moonLight.shadow.camera.far = 500;
+moonLight.shadow.camera.left = -100;
+moonLight.shadow.camera.right = 100;
+moonLight.shadow.camera.top = 100;
+moonLight.shadow.camera.bottom = -100;
+scene.add(moonLight);
 
-// Partikel asap panggung sederhana
-function createSmokeParticles() {
-    const particleCount = 200;
-    const geometry = new THREE.BufferGeometry();
-    const positions = [];
+// Torch lights (obor) - akan ditambahkan di sekitar ogoh-ogoh
+function createTorchLight(x, y, z) {
+    const torchLight = new THREE.PointLight(0xff6600, 2, 15);
+    torchLight.position.set(x, y, z);
+    torchLight.castShadow = true;
+    scene.add(torchLight);
 
-    for (let i = 0; i < particleCount; i++) {
-        const x = (Math.random() - 0.5) * 6;
-        const y = Math.random() * 3 + 0.5; // di atas lantai
-        const z = (Math.random() - 0.5) * 6;
-        positions.push(x, y, z);
+    // Visual obor
+    const torchGeom = new THREE.CylinderGeometry(0.1, 0.15, 1.5, 8);
+    const torchMat = new THREE.MeshStandardMaterial({ color: 0x4a3728 });
+    const torch = new THREE.Mesh(torchGeom, torchMat);
+    torch.position.set(x, y - 0.75, z);
+    scene.add(torch);
+
+    // Api (particles sederhana)
+    const fireGeom = new THREE.SphereGeometry(0.2, 8, 8);
+    const fireMat = new THREE.MeshBasicMaterial({ color: 0xff4400 });
+    const fire = new THREE.Mesh(fireGeom, fireMat);
+    fire.position.set(x, y + 0.3, z);
+    fire.userData.isFlame = true;
+    scene.add(fire);
+
+    return { light: torchLight, fire };
+}
+
+// =========================
+// TERRAIN - OPEN WORLD
+// =========================
+
+// Ground - tanah luas
+const groundGeom = new THREE.PlaneGeometry(200, 200, 50, 50);
+const groundMat = new THREE.MeshStandardMaterial({
+    color: 0x4a8a3c,
+    roughness: 0.8,
+});
+const ground = new THREE.Mesh(groundGeom, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Jalan setapak
+function createPath() {
+    const pathGeom = new THREE.PlaneGeometry(4, 100);
+    const pathMat = new THREE.MeshStandardMaterial({
+        color: 0x8b7355,
+        roughness: 1,
+    });
+    const path = new THREE.Mesh(pathGeom, pathMat);
+    path.rotation.x = -Math.PI / 2;
+    path.position.y = 0.01;
+    scene.add(path);
+
+    // Path horizontal
+    const path2 = path.clone();
+    path2.rotation.z = Math.PI / 2;
+    scene.add(path2);
+}
+createPath();
+
+// Pohon sederhana
+function createTree(x, z) {
+    const trunkGeom = new THREE.CylinderGeometry(0.3, 0.4, 3, 8);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3728 });
+    const trunk = new THREE.Mesh(trunkGeom, trunkMat);
+    trunk.position.set(x, 1.5, z);
+    trunk.castShadow = true;
+    scene.add(trunk);
+
+    const leavesGeom = new THREE.SphereGeometry(2, 8, 8);
+    const leavesMat = new THREE.MeshStandardMaterial({ color: 0x1a4a1a });
+    const leaves = new THREE.Mesh(leavesGeom, leavesMat);
+    leaves.position.set(x, 4, z);
+    leaves.castShadow = true;
+    scene.add(leaves);
+}
+
+// Spawn pohon random
+for (let i = 0; i < 30; i++) {
+    const x = (Math.random() - 0.5) * 150;
+    const z = (Math.random() - 0.5) * 150;
+    // Hindari area tengah (jalan)
+    if (Math.abs(x) > 8 || Math.abs(z) > 8) {
+        createTree(x, z);
     }
-
-    geometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(positions, 3)
-    );
-
-    const material = new THREE.PointsMaterial({
-        size: 0.08,
-        color: 0xffcccc,
-        transparent: true,
-        opacity: 0.7,
-    });
-
-    const points = new THREE.Points(geometry, material);
-    points.name = "smokeParticles";
-    scene.add(points);
 }
-createSmokeParticles();
+
+// Batu dekorasi
+function createRock(x, z, scale = 1) {
+    const rockGeom = new THREE.DodecahedronGeometry(scale, 0);
+    const rockMat = new THREE.MeshStandardMaterial({
+        color: 0x555555,
+        roughness: 0.9,
+    });
+    const rock = new THREE.Mesh(rockGeom, rockMat);
+    rock.position.set(x, scale * 0.5, z);
+    rock.rotation.set(Math.random(), Math.random(), Math.random());
+    rock.castShadow = true;
+    scene.add(rock);
+}
+
+for (let i = 0; i < 20; i++) {
+    const x = (Math.random() - 0.5) * 100;
+    const z = (Math.random() - 0.5) * 100;
+    createRock(x, z, 0.5 + Math.random() * 1);
+}
 
 // =========================
-// PANGGUNG & LANTAI
+// OGOH-OGOH SYSTEM
 // =========================
-
-function createStage() {
-    const stageGeo = new THREE.CylinderGeometry(2.5, 2.5, 0.2, 64);
-    const stageMat = new THREE.MeshStandardMaterial({
-        color: 0x332222,
-        roughness: 0.8,
-    });
-    const stage = new THREE.Mesh(stageGeo, stageMat);
-    stage.position.y = -0.1; // Sedikit di bawah model Reog
-    stage.receiveShadow = true;
-    scene.add(stage);
-}
-createStage();
-
-// =========================
-// LOAD MODEL REOG + TEXTURE TOGGLE
-// =========================
-
-let reogModel = null;
-let reogBoundingBox = null;
-
-// simpan state material asli GLB
-const texLoader = new THREE.TextureLoader();
-let originalMaterialStateStored = false;
-
-// State untuk siklus tekstur
-// 0: GLB, 1-4: PNG textures
-let currentTextureState = 0;
-const pngDiffuseTextures = [
-    "/texture_diffuse_1.png",
-    "/texture_metallic.png", // Asumsi nama file
-    "/texture_normal_0.png", // Asumsi nama file
-    "/texture_roughness.png", // Asumsi nama file
-];
-
-function storeOriginalMaterialState() {
-    if (!reogModel || originalMaterialStateStored) return;
-
-    reogModel.traverse((child) => {
-        if (child.isMesh && child.material) {
-            // simpan properti penting untuk dikembalikan
-            child.userData._origMaterialProps = {
-                map: child.material.map,
-                normalMap: child.material.normalMap,
-                roughnessMap: child.material.roughnessMap,
-                metalnessMap: child.material.metalnessMap,
-                color: child.material.color.clone(),
-                roughness: child.material.roughness,
-                metalness: child.material.metalness,
-                emissive: child.material.emissive.clone(),
-                emissiveIntensity: child.material.emissiveIntensity,
-            };
-        }
-    });
-
-    originalMaterialStateStored = true;
-}
-
-function applyPNGTextures(index) {
-    if (!reogModel) return;
-    if (index < 0 || index >= pngDiffuseTextures.length) return;
-
-    const diffuse = texLoader.load(pngDiffuseTextures[index]);
-    const roughness = texLoader.load("/texture_roughness.png");
-    const metallic = texLoader.load("/texture_metallic.png");
-    const normal = texLoader.load("/texture_normal_0.png");
-
-    reogModel.traverse((child) => {
-        if (child.isMesh && child.material) {
-            child.material.map = diffuse;
-            child.material.roughnessMap = roughness;
-            child.material.metalnessMap = metallic;
-            child.material.normalMap = normal;
-
-            child.material.needsUpdate = true;
-        }
-    });
-
-    console.log(`✔ PNG texture ${index + 1} applied`);
-}
-
-function restoreGLBTextures() {
-    if (!reogModel) return;
-
-    reogModel.traverse((child) => {
-        if (child.isMesh && child.material && child.userData._origMaterialProps) {
-            const orig = child.userData._origMaterialProps;
-            child.material.map = orig.map;
-            child.material.normalMap = orig.normalMap;
-            child.material.roughnessMap = orig.roughnessMap;
-            child.material.metalnessMap = orig.metalnessMap;
-            child.material.color.copy(orig.color);
-            child.material.roughness = orig.roughness;
-            child.material.metalness = orig.metalness;
-            child.material.emissive.copy(orig.emissive);
-            child.material.emissiveIntensity = orig.emissiveIntensity;
-
-            child.material.needsUpdate = true;
-        }
-    });
-
-    console.log("✔ Restored GLB textures/materials");
-}
 
 const loader = new GLTFLoader();
-loader.load(
-    "/Reog.glb",
-    (gltf) => {
-        reogModel = gltf.scene;
-        reogModel.position.set(0, 0, 0);
-        reogModel.scale.set(1, 1, 1);
+const ogohOgohList = [];
 
-        // Hitung bounding box untuk penentuan region klik
-        reogBoundingBox = new THREE.Box3().setFromObject(reogModel);
+// Lokasi spawn Ogoh-ogoh
+const ogohLocations = [
+    { x: 0, z: 0, scale: 5, name: "Bhuta Kala", desc: "Raksasa penguasa waktu dan kematian" },
+    { x: 25, z: 15, scale: 4.5, name: "Rangda", desc: "Ratu para leak dan simbol kejahatan" },
+    { x: -20, z: 25, scale: 5.5, name: "Bhatara Kala", desc: "Dewa waktu yang menakutkan" },
+    { x: 30, z: -20, scale: 4, name: "Celuluk", desc: "Makhluk pelindung dari roh jahat" },
+    { x: -30, z: -15, scale: 4.8, name: "Leak Pamoroan", desc: "Siluman yang muncul saat malam" },
+];
 
-        // Aktifkan shadow dan simpan emissive asli
-        reogModel.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-                if (child.material) {
-                    child.material.originalEmissive =
-                        child.material.emissive?.clone() || new THREE.Color(0x000000);
+function loadOgohOgoh(location, index) {
+    const yPos = 1.5; // Posisi Y agar tidak tenggelam
+
+    loader.load(
+        "/ogoh.glb",
+        (gltf) => {
+            const ogoh = gltf.scene;
+            ogoh.position.set(location.x, yPos, location.z);
+            ogoh.scale.set(location.scale, location.scale, location.scale);
+
+            // Random rotation
+            ogoh.rotation.y = Math.random() * Math.PI * 2;
+
+            ogoh.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
                 }
-            }
-        });
+            });
 
-        scene.add(reogModel);
-        console.log("✔ Reog loaded");
+            scene.add(ogoh);
 
-        // simpan material GLB original setelah model masuk scene
-        storeOriginalMaterialState();
-    },
-    undefined,
-    (err) => {
-        console.error("❌ Failed to load GLB:", err);
-    }
-);
+            // Data untuk interaksi
+            ogoh.userData = {
+                name: location.name,
+                description: location.desc,
+                index: index,
+                originalY: yPos,
+            };
+
+            ogohOgohList.push(ogoh);
+
+            // Tambah obor di sekitar
+            createTorchLight(location.x + 3, 2, location.z);
+            createTorchLight(location.x - 3, 2, location.z);
+
+            console.log("Ogoh-ogoh loaded:", location.name);
+        },
+        undefined,
+        (err) => console.error("Failed to load Ogoh-ogoh:", err)
+    );
+}
+
+// Load semua Ogoh-ogoh
+ogohLocations.forEach((loc, i) => loadOgohOgoh(loc, i));
 
 // =========================
-// AUDIO (MUSIK & EFEK)
+// PLAYER MOVEMENT SYSTEM
+// =========================
+
+const playerState = {
+    moveForward: false,
+    moveBackward: false,
+    moveLeft: false,
+    moveRight: false,
+    canJump: true,
+    velocity: new THREE.Vector3(),
+    direction: new THREE.Vector3(),
+    speed: 15,
+    jumpHeight: 8,
+};
+
+// Keyboard controls
+document.addEventListener("keydown", (e) => {
+    switch (e.code) {
+        case "KeyW":
+        case "ArrowUp":
+            playerState.moveForward = true;
+            break;
+        case "KeyS":
+        case "ArrowDown":
+            playerState.moveBackward = true;
+            break;
+        case "KeyA":
+        case "ArrowLeft":
+            playerState.moveLeft = true;
+            break;
+        case "KeyD":
+        case "ArrowRight":
+            playerState.moveRight = true;
+            break;
+        case "Space":
+            if (playerState.canJump) {
+                playerState.velocity.y = playerState.jumpHeight;
+                playerState.canJump = false;
+            }
+            break;
+    }
+});
+
+document.addEventListener("keyup", (e) => {
+    switch (e.code) {
+        case "KeyW":
+        case "ArrowUp":
+            playerState.moveForward = false;
+            break;
+        case "KeyS":
+        case "ArrowDown":
+            playerState.moveBackward = false;
+            break;
+        case "KeyA":
+        case "ArrowLeft":
+            playerState.moveLeft = false;
+            break;
+        case "KeyD":
+        case "ArrowRight":
+            playerState.moveRight = false;
+            break;
+    }
+});
+
+// =========================
+// UI SYSTEM
+// =========================
+
+// Overlay untuk pointer lock
+const blocker = document.createElement("div");
+blocker.id = "blocker";
+blocker.style.cssText = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; font-family: Segoe UI, sans-serif; color: white;";
+
+blocker.innerHTML = '<h1 style="font-size: 48px; margin-bottom: 10px; color: #ff6b35;">OGOH-OGOH WORLD</h1><p style="font-size: 18px; color: #aaa; margin-bottom: 30px;">Jelajahi dunia Ogoh-ogoh saat malam Nyepi</p><button id="playBtn" style="padding: 15px 40px; font-size: 20px; background: linear-gradient(45deg, #ff6b35, #f7931e); border: none; border-radius: 10px; color: white; cursor: pointer; font-weight: bold;">MULAI JELAJAH</button><div style="margin-top: 40px; text-align: center; color: #888;"><p>WASD atau Arrow Keys - Bergerak</p><p>Mouse - Melihat sekeliling</p><p>Space - Lompat</p><p>Dekati Ogoh-ogoh untuk melihat info</p></div>';
+document.body.appendChild(blocker);
+
+document.getElementById("playBtn").addEventListener("click", () => {
+    controls.lock();
+});
+
+controls.addEventListener("lock", () => {
+    blocker.style.display = "none";
+});
+
+controls.addEventListener("unlock", () => {
+    blocker.style.display = "flex";
+});
+
+// HUD
+const hud = document.createElement("div");
+hud.style.cssText = "position: fixed; top: 20px; left: 20px; padding: 15px 20px; background: rgba(0, 0, 0, 0.7); color: white; font-family: Segoe UI, sans-serif; border-radius: 10px; border-left: 4px solid #ff6b35; z-index: 100; display: none;";
+hud.innerHTML = '<div style="font-size: 14px; color: #ff6b35; font-weight: bold;">OGOH-OGOH WORLD</div><div id="playerPos" style="font-size: 12px; margin-top: 5px; color: #aaa;">Posisi: 0, 0</div><div id="nearestOgoh" style="font-size: 12px; margin-top: 5px; color: #aaa;">Dekati Ogoh-ogoh...</div>';
+document.body.appendChild(hud);
+
+// Crosshair
+const crosshair = document.createElement("div");
+crosshair.style.cssText = "position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; border: 2px solid rgba(255, 255, 255, 0.5); border-radius: 50%; z-index: 100; pointer-events: none; display: none;";
+document.body.appendChild(crosshair);
+
+// Info panel untuk Ogoh-ogoh
+const infoPanel = document.createElement("div");
+infoPanel.id = "ogohInfo";
+infoPanel.style.cssText = "position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 20px 30px; background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(30,10,10,0.95) 100%); color: white; font-family: Segoe UI, sans-serif; border-radius: 15px; border: 2px solid #ff6b35; z-index: 100; display: none; text-align: center; max-width: 400px;";
+document.body.appendChild(infoPanel);
+
+// Minimap
+const minimap = document.createElement("canvas");
+minimap.width = 150;
+minimap.height = 150;
+minimap.style.cssText = "position: fixed; bottom: 20px; right: 20px; border: 2px solid #ff6b35; border-radius: 10px; background: rgba(0, 0, 0, 0.7); z-index: 100; display: none;";
+document.body.appendChild(minimap);
+const minimapCtx = minimap.getContext("2d");
+
+function updateMinimap() {
+    minimapCtx.clearRect(0, 0, 150, 150);
+    minimapCtx.fillStyle = "rgba(30, 50, 30, 0.8)";
+    minimapCtx.fillRect(0, 0, 150, 150);
+
+    // Player position
+    const px = 75 + (camera.position.x / 100) * 75;
+    const pz = 75 + (camera.position.z / 100) * 75;
+    minimapCtx.fillStyle = "#00ff00";
+    minimapCtx.beginPath();
+    minimapCtx.arc(px, pz, 5, 0, Math.PI * 2);
+    minimapCtx.fill();
+
+    // Ogoh-ogoh positions
+    minimapCtx.fillStyle = "#ff6b35";
+    ogohOgohList.forEach((ogoh) => {
+        const ox = 75 + (ogoh.position.x / 100) * 75;
+        const oz = 75 + (ogoh.position.z / 100) * 75;
+        minimapCtx.beginPath();
+        minimapCtx.arc(ox, oz, 4, 0, Math.PI * 2);
+        minimapCtx.fill();
+    });
+}
+
+// =========================
+// AUDIO SYSTEM
 // =========================
 
 const listener = new THREE.AudioListener();
 camera.add(listener);
 
 const bgMusic = new THREE.Audio(listener);
-const gongSound = new THREE.Audio(listener);
-const kendangSound = new THREE.Audio(listener);
-
 const audioLoader = new THREE.AudioLoader();
 
 audioLoader.load("/reog-music.mp3", (buffer) => {
     bgMusic.setBuffer(buffer);
     bgMusic.setLoop(true);
-    bgMusic.setVolume(0.45);
-    createMusicButton(bgMusic);
+    bgMusic.setVolume(0.3);
 });
 
-audioLoader.load("/src/assets/gong.mp3", (buffer) => {
-    gongSound.setBuffer(buffer);
-    gongSound.setLoop(false);
-    gongSound.setVolume(0.8);
-});
-
-audioLoader.load("/src/assets/kendang.mp3", (buffer) => {
-    kendangSound.setBuffer(buffer);
-    kendangSound.setLoop(false);
-    kendangSound.setVolume(0.5);
-});
-
-// =========================
-// UI: TITLE & PANEL KONTROL
-// =========================
-
-// Judul di atas layar
-const title = document.createElement("div");
-title.innerHTML = "Reog Ponorogo 3D Interactive Museum";
-title.style.position = "absolute";
-title.style.top = "20px";
-title.style.left = "50%";
-title.style.transform = "translateX(-50%)";
-title.style.padding = "10px 20px";
-title.style.fontSize = "22px";
-title.style.color = "white";
-title.style.background = "rgba(0,0,0,0.6)";
-title.style.borderRadius = "6px";
-title.style.fontFamily = "sans-serif";
-title.style.zIndex = "1000";
-document.body.appendChild(title);
-
-// Panel kontrol kiri bawah
-const controlPanel = document.createElement("div");
-controlPanel.style.position = "absolute";
-controlPanel.style.left = "20px";
-controlPanel.style.bottom = "20px";
-controlPanel.style.padding = "10px 15px";
-controlPanel.style.background = "rgba(0,0,0,0.7)";
-controlPanel.style.color = "white";
-controlPanel.style.fontFamily = "sans-serif";
-controlPanel.style.fontSize = "13px";
-controlPanel.style.borderRadius = "8px";
-controlPanel.style.zIndex = "1000";
-controlPanel.style.maxWidth = "220px";
-controlPanel.innerHTML = `
-  <div style="font-weight:bold; margin-bottom:8px;">Kontrol Kamera</div>
-`;
-document.body.appendChild(controlPanel);
-
-function createButton(label, onClick) {
-    const btn = document.createElement("button");
-    btn.innerText = label;
-    btn.style.display = "block";
-    btn.style.width = "100%";
-    btn.style.marginTop = "5px";
-    btn.style.padding = "6px 8px";
-    btn.style.border = "none";
-    btn.style.borderRadius = "4px";
-    btn.style.background = "#aa0000";
-    btn.style.color = "white";
-    btn.style.cursor = "pointer";
-    btn.style.fontSize = "12px";
-    btn.onclick = onClick;
-    controlPanel.appendChild(btn);
-    return btn;
-}
-
-// Zoom In/Out/Reset
-createButton("Zoom In", () => {
-    controls.dollyIn(1.1);
-    controls.update();
-});
-createButton("Zoom Out", () => {
-    controls.dollyOut(1.1);
-    controls.update();
-});
-createButton("Reset Kamera", () => {
-    camera.position.copy(defaultCameraPos);
-    controls.target.set(0, 1, 0);
-    controls.update();
-});
-
-// Auto Orbit toggle
-let autoOrbitEnabled = false;
-let autoOrbitAngle = 0;
-const autoOrbitBtn = createButton("Auto Orbit: OFF", () => {
-    autoOrbitEnabled = !autoOrbitEnabled;
-    autoOrbitBtn.innerText = autoOrbitEnabled ? "Auto Orbit: ON" : "Auto Orbit: OFF";
-});
-
-// Mode eksplorasi: Orbit vs FPS
-let mode = "orbit"; // "orbit" | "fps"
-const modeBtn = createButton("Mode: Orbit (Default)", () => {
-    if (mode === "orbit") {
-        mode = "fps";
-        controls.enabled = false;
-        modeBtn.innerText = "Mode: First Person";
+// Music toggle button
+const musicBtn = document.createElement("button");
+musicBtn.innerText = "Musik OFF";
+musicBtn.style.cssText = "position: fixed; top: 20px; right: 20px; padding: 10px 15px; background: rgba(0, 0, 0, 0.7); color: white; border: 2px solid #ff6b35; border-radius: 8px; cursor: pointer; font-size: 14px; z-index: 100; display: none;";
+musicBtn.onclick = () => {
+    if (bgMusic.isPlaying) {
+        bgMusic.pause();
+        musicBtn.innerText = "Musik OFF";
     } else {
-        mode = "orbit";
-        controls.enabled = true;
-        modeBtn.innerText = "Mode: Orbit (Default)";
-    }
-});
-
-// Petunjuk kecil
-const hint = document.createElement("div");
-hint.style.marginTop = "8px";
-hint.style.fontSize = "11px";
-hint.style.opacity = "0.9";
-hint.innerHTML = `
-  Orbit: drag mouse<br>
-  FPS: W/A/S/D + panah (←↑→↓)<br>
-  Klik Reog: info + gong<br>
-  Hover: highlight + kendang
-`;
-controlPanel.appendChild(hint);
-
-// Tombol musik
-function createMusicButton(sound) {
-    const btn = document.createElement("button");
-    btn.innerText = "Play Musik Reog";
-    btn.style.position = "absolute";
-    btn.style.bottom = "20px";
-    btn.style.right = "20px";
-    btn.style.padding = "10px 20px";
-    btn.style.fontSize = "14px";
-    btn.style.background = "#aa0000";
-    btn.style.color = "white";
-    btn.style.border = "none";
-    btn.style.borderRadius = "6px";
-    btn.style.cursor = "pointer";
-    btn.style.fontWeight = "bold";
-    btn.style.zIndex = "1000";
-
-    btn.onclick = () => {
-        if (!sound.isPlaying) {
-            sound.play();
-            btn.innerText = "Stop Musik Reog";
-        } else {
-            sound.stop();
-            btn.innerText = "Play Musik Reog";
-        }
-    };
-
-    document.body.appendChild(btn);
-}
-
-// =========================
-// TOMBOL TOGGLE TEKSTUR PNG / GLB
-// =========================
-
-const texBtn = document.createElement("button");
-texBtn.innerText = "Texture: GLB";
-texBtn.style.position = "absolute";
-texBtn.style.top = "60px";
-texBtn.style.right = "20px";
-texBtn.style.padding = "8px 16px";
-texBtn.style.background = "#0066aa";
-texBtn.style.color = "white";
-texBtn.style.border = "none";
-texBtn.style.borderRadius = "6px";
-texBtn.style.cursor = "pointer";
-texBtn.style.fontSize = "13px";
-texBtn.style.fontWeight = "bold";
-texBtn.style.zIndex = "1000";
-document.body.appendChild(texBtn);
-
-texBtn.onclick = () => {
-    if (!reogModel || !originalMaterialStateStored) return;
-
-    // Siklus dari 0 (GLB) ke 4 (PNG ke-4), lalu kembali ke 0
-    currentTextureState = (currentTextureState + 1) % (pngDiffuseTextures.length + 1);
-
-    if (currentTextureState === 0) {
-        // Kembali ke tekstur GLB asli
-        restoreGLBTextures();
-        texBtn.innerText = "Texture: GLB";
-    } else {
-        // Terapkan tekstur PNG sesuai state
-        const pngIndex = currentTextureState - 1;
-        applyPNGTextures(pngIndex);
-        texBtn.innerText = `Texture: PNG ${currentTextureState}`;
+        bgMusic.play();
+        musicBtn.innerText = "Musik ON";
     }
 };
+document.body.appendChild(musicBtn);
 
 // =========================
-// RAYCASTING: HOVER & KLIK
+// PROXIMITY INTERACTION
 // =========================
 
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
+let currentNearestOgoh = null;
 
-let isHoveringReog = false;
-let lastHoverSoundTime = 0;
+function checkProximity() {
+    let nearest = null;
+    let nearestDist = Infinity;
 
-// Highlight: ubah emissive jadi merah keemasan
-function setReogHighlight(active) {
-    if (!reogModel) return;
-    reogModel.traverse((child) => {
-        if (child.isMesh && child.material) {
-            if (active) {
-                child.material.emissive = new THREE.Color(0xff6600);
-                child.material.emissiveIntensity = 0.6;
-            } else if (child.material.originalEmissive) {
-                child.material.emissive.copy(child.material.originalEmissive);
-                child.material.emissiveIntensity = 1.0;
-            }
+    ogohOgohList.forEach((ogoh) => {
+        const dist = camera.position.distanceTo(ogoh.position);
+        if (dist < nearestDist) {
+            nearestDist = dist;
+            nearest = ogoh;
         }
     });
-}
 
-// Hover
-window.addEventListener("mousemove", (event) => {
-    if (!reogModel) return;
+    const nearestInfo = document.getElementById("nearestOgoh");
 
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    if (nearest && nearestDist < 8) {
+        currentNearestOgoh = nearest;
+        nearestInfo.innerHTML = '<span style="color: #ff6b35;">' + nearest.userData.name + '</span> (' + nearestDist.toFixed(1) + 'm)';
 
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(reogModel, true);
+        // Show info panel
+        infoPanel.style.display = "block";
+        infoPanel.innerHTML = '<div style="font-size: 24px; color: #ff6b35; margin-bottom: 10px;">' + nearest.userData.name + '</div><div style="font-size: 14px; color: #ccc;">' + nearest.userData.description + '</div><div style="font-size: 11px; color: #666; margin-top: 10px;">Jarak: ' + nearestDist.toFixed(1) + ' meter</div>';
 
-    if (intersects.length > 0) {
-        if (!isHoveringReog) {
-            isHoveringReog = true;
-            setReogHighlight(true);
-
-            const now = performance.now();
-            if (kendangSound.buffer && now - lastHoverSoundTime > 800) {
-                kendangSound.stop();
-                kendangSound.play();
-                lastHoverSoundTime = now;
-            }
-        }
+        // Animate ogoh-ogoh when near
+        nearest.position.y = nearest.userData.originalY + Math.sin(Date.now() * 0.003) * 0.2;
     } else {
-        if (isHoveringReog) {
-            isHoveringReog = false;
-            setReogHighlight(false);
-        }
+        currentNearestOgoh = null;
+        nearestInfo.innerHTML = "Dekati Ogoh-ogoh...";
+        infoPanel.style.display = "none";
     }
-});
-
-// Klik: info + gong + label tergantung region
-window.addEventListener("click", (event) => {
-    if (!reogModel) return;
-
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(reogModel, true);
-
-    if (intersects.length > 0) {
-        // Mainkan gong
-        if (gongSound.buffer) {
-            gongSound.stop();
-            gongSound.play();
-        }
-
-        const pointWorld = intersects[0].point.clone();
-        const pointLocal = reogModel.worldToLocal(pointWorld);
-
-        let section = "Umum";
-        let text = `
-      Reog adalah seni pertunjukan tradisional dari Ponorogo, Jawa Timur.
-      Pertunjukan melibatkan topeng besar, Warok, Jathilan, dan gamelan.
-    `;
-
-        if (reogBoundingBox) {
-            const height = reogBoundingBox.max.y - reogBoundingBox.min.y;
-            const normY = (pointLocal.y - reogBoundingBox.min.y) / height;
-
-            if (normY > 0.7) {
-                section = "Dadak Merak";
-                text = `
-          <b>Dadak Merak</b> adalah ikon utama Reog Ponorogo.
-          Topeng besar dengan bulu merak ini bisa mencapai berat puluhan kilogram,
-          dan biasanya dipikul oleh satu penari menggunakan kekuatan gigi.
-        `;
-            } else if (normY > 0.35) {
-                section = "Wajah Barongan / Warok";
-                text = `
-          Bagian tengah menggambarkan sosok barongan atau Warok,
-          tokoh kuat dan sakti dalam tradisi Reog. Warok melambangkan
-          penjaga moral dan spiritual masyarakat.
-        `;
-            } else {
-                section = "Kostum & Penari Bawah";
-                text = `
-          Bagian bawah berisi kostum dan elemen pendukung penari.
-          Gerakan penari Jathilan dan pengiring lain memperkuat
-          nuansa magis dan heroik dalam pertunjukan Reog.
-        `;
-            }
-        }
-
-        showInfoBox(section, text);
-    }
-});
-
-function showInfoBox(titleText, contentHtml) {
-    let box = document.getElementById("reog-info-box");
-    if (!box) {
-        box = document.createElement("div");
-        box.id = "reog-info-box";
-        box.style.position = "absolute";
-        box.style.bottom = "20px";
-        box.style.left = "250px";
-        box.style.padding = "15px";
-        box.style.background = "rgba(0,0,0,0.85)";
-        box.style.color = "white";
-        box.style.fontFamily = "sans-serif";
-        box.style.borderRadius = "8px";
-        box.style.maxWidth = "320px";
-        box.style.lineHeight = "1.4";
-        box.style.zIndex = "999";
-
-        const closeBtn = document.createElement("button");
-        closeBtn.innerText = "Tutup";
-        closeBtn.style.marginTop = "10px";
-        closeBtn.style.padding = "6px 12px";
-        closeBtn.style.border = "none";
-        closeBtn.style.borderRadius = "4px";
-        closeBtn.style.background = "#aa0000";
-        closeBtn.style.color = "white";
-        closeBtn.style.cursor = "pointer";
-        closeBtn.onclick = () => box.remove();
-
-        box.appendChild(closeBtn);
-        document.body.appendChild(box);
-    }
-
-    box.innerHTML = `
-    <div style="font-size:16px; font-weight:bold; margin-bottom:6px;">${titleText}</div>
-    <div style="font-size:13px; margin-bottom:8px;">${contentHtml}</div>
-    <button id="close-info-btn" style="
-      margin-top: 5px;
-      padding:6px 12px;
-      border:none;
-      border-radius:4px;
-      background:#aa0000;
-      color:white;
-      cursor:pointer;">
-      Tutup
-    </button>
-  `;
-
-    document.getElementById("close-info-btn").onclick = () => box.remove();
 }
 
 // =========================
-// MODE FPS: GERAK KAMERA
+// PARTICLE SYSTEM - API/ASAP
 // =========================
 
-const fpsState = {
-    moveForward: false,
-    moveBackward: false,
-    moveLeft: false,
-    moveRight: false,
-    rotLeft: false,
-    rotRight: false,
-    rotUp: false,
-    rotDown: false,
-};
+function createFireParticles() {
+    const particleCount = 500;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
 
-window.addEventListener("keydown", (e) => {
-    switch (e.code) {
-        case "KeyW":
-            fpsState.moveForward = true;
-            break;
-        case "KeyS":
-            fpsState.moveBackward = true;
-            break;
-        case "KeyA":
-            fpsState.moveLeft = true;
-            break;
-        case "KeyD":
-            fpsState.moveRight = true;
-            break;
-        case "ArrowLeft":
-            fpsState.rotLeft = true;
-            break;
-        case "ArrowRight":
-            fpsState.rotRight = true;
-            break;
-        case "ArrowUp":
-            fpsState.rotUp = true;
-            break;
-        case "ArrowDown":
-            fpsState.rotDown = true;
-            break;
-    }
-});
+    for (let i = 0; i < particleCount; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 200;
+        positions[i * 3 + 1] = Math.random() * 10;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
 
-window.addEventListener("keyup", (e) => {
-    switch (e.code) {
-        case "KeyW":
-            fpsState.moveForward = false;
-            break;
-        case "KeyS":
-            fpsState.moveBackward = false;
-            break;
-        case "KeyA":
-            fpsState.moveLeft = false;
-            break;
-        case "KeyD":
-            fpsState.moveRight = false;
-            break;
-        case "ArrowLeft":
-            fpsState.rotLeft = false;
-            break;
-        case "ArrowRight":
-            fpsState.rotRight = false;
-            break;
-        case "ArrowUp":
-            fpsState.rotUp = false;
-            break;
-        case "ArrowDown":
-            fpsState.rotDown = false;
-            break;
+        colors[i * 3] = 1;
+        colors[i * 3 + 1] = Math.random() * 0.5;
+        colors[i * 3 + 2] = 0;
     }
-});
+
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+        size: 0.3,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.6,
+    });
+
+    const particles = new THREE.Points(geometry, material);
+    particles.name = "fireParticles";
+    scene.add(particles);
+}
+createFireParticles();
 
 // =========================
 // RESPONSIVE
@@ -680,67 +479,96 @@ window.addEventListener("resize", () => {
 });
 
 // =========================
-// ANIMATE LOOP
+// ANIMATION LOOP
 // =========================
 
 const clock = new THREE.Clock();
+let prevTime = performance.now();
 
 function animate() {
     requestAnimationFrame(animate);
 
-    const delta = clock.getDelta();
-    const elapsed = clock.getElapsedTime();
+    const time = performance.now();
+    const delta = (time - prevTime) / 1000;
+    prevTime = time;
 
-    // Gerakkan asap pelan naik-turun
-    const smoke = scene.getObjectByName("smokeParticles");
-    if (smoke) {
-        smoke.position.y = Math.sin(elapsed * 0.3) * 0.2;
+    if (controls.isLocked) {
+        // Show UI elements
+        hud.style.display = "block";
+        crosshair.style.display = "block";
+        minimap.style.display = "block";
+        musicBtn.style.display = "block";
+
+        // Player movement with gravity
+        playerState.velocity.y -= 20 * delta; // Gravity
+
+        playerState.direction.z = Number(playerState.moveForward) - Number(playerState.moveBackward);
+        playerState.direction.x = Number(playerState.moveRight) - Number(playerState.moveLeft);
+        playerState.direction.normalize();
+
+        if (playerState.moveForward || playerState.moveBackward) {
+            playerState.velocity.z = -playerState.direction.z * playerState.speed;
+        } else {
+            playerState.velocity.z = 0;
+        }
+
+        if (playerState.moveLeft || playerState.moveRight) {
+            playerState.velocity.x = -playerState.direction.x * playerState.speed;
+        } else {
+            playerState.velocity.x = 0;
+        }
+
+        controls.moveRight(-playerState.velocity.x * delta);
+        controls.moveForward(-playerState.velocity.z * delta);
+
+        camera.position.y += playerState.velocity.y * delta;
+
+        // Ground collision
+        if (camera.position.y < 2) {
+            playerState.velocity.y = 0;
+            camera.position.y = 2;
+            playerState.canJump = true;
+        }
+
+        // Boundary check
+        camera.position.x = Math.max(-95, Math.min(95, camera.position.x));
+        camera.position.z = Math.max(-95, Math.min(95, camera.position.z));
+
+        // Update HUD
+        document.getElementById("playerPos").textContent = "Posisi: " + camera.position.x.toFixed(0) + ", " + camera.position.z.toFixed(0);
+
+        // Check proximity to Ogoh-ogoh
+        checkProximity();
+
+        // Update minimap
+        updateMinimap();
+    } else {
+        hud.style.display = "none";
+        crosshair.style.display = "none";
+        minimap.style.display = "none";
+        musicBtn.style.display = "none";
     }
 
-    // Gerak spotlight kedua
-    movingSpot.position.x = Math.sin(elapsed * 0.5) * 6;
-    movingSpot.position.z = Math.cos(elapsed * 0.5) * 6;
-
-    // Auto orbit kamera
-    if (autoOrbitEnabled && mode === "orbit") {
-        autoOrbitAngle += delta * 0.3;
-        const radius = 6;
-        camera.position.x = Math.cos(autoOrbitAngle) * radius;
-        camera.position.z = Math.sin(autoOrbitAngle) * radius;
-        camera.position.y = 2.5;
-        controls.target.set(0, 1, 0);
+    // Animate fire particles
+    const fireParticles = scene.getObjectByName("fireParticles");
+    if (fireParticles) {
+        const positions = fireParticles.geometry.attributes.position.array;
+        for (let i = 0; i < positions.length; i += 3) {
+            positions[i + 1] += delta * 2;
+            if (positions[i + 1] > 15) {
+                positions[i + 1] = 0;
+            }
+        }
+        fireParticles.geometry.attributes.position.needsUpdate = true;
     }
 
-    // Rotasi model pelan
-    if (reogModel) {
-        reogModel.rotation.y += 0.003;
-    }
+    // Animate flames
+    scene.traverse((obj) => {
+        if (obj.userData && obj.userData.isFlame) {
+            obj.scale.setScalar(1 + Math.sin(time * 0.01) * 0.3);
+        }
+    });
 
-    // Mode FPS gerak kamera
-    if (mode === "fps") {
-        const moveSpeed = 3 * delta;
-        const rotSpeed = 1.5 * delta;
-
-        const forward = new THREE.Vector3();
-        camera.getWorldDirection(forward);
-        forward.y = 0;
-        forward.normalize();
-
-        const right = new THREE.Vector3();
-        right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize().multiplyScalar(-1);
-
-        if (fpsState.moveForward) camera.position.addScaledVector(forward, moveSpeed);
-        if (fpsState.moveBackward) camera.position.addScaledVector(forward, -moveSpeed);
-        if (fpsState.moveLeft) camera.position.addScaledVector(right, -moveSpeed);
-        if (fpsState.moveRight) camera.position.addScaledVector(right, moveSpeed);
-
-        if (fpsState.rotLeft) camera.rotation.y += rotSpeed;
-        if (fpsState.rotRight) camera.rotation.y -= rotSpeed;
-        if (fpsState.rotUp) camera.rotation.x += rotSpeed * 0.5;
-        if (fpsState.rotDown) camera.rotation.x -= rotSpeed * 0.5;
-    }
-
-    controls.update();
     renderer.render(scene, camera);
 }
 
