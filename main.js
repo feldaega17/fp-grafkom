@@ -889,6 +889,13 @@ function toggleDayNight() {
         moonLight.intensity = 2.0; // Balance dengan ambient yang naik
         moonLight.position.set(50, 100, 100); // Cahaya dari depan-atas-kanan
         
+        // Update Moon Mesh Appearance
+        if(moonMesh) {
+            moonMesh.material.color.setHex(0xaaccff); // Pale Blue Moon
+            moonMesh.position.copy(moonLight.position).normalize().multiplyScalar(400);
+            moonMesh.scale.set(1, 1, 1); // Normal size
+        }
+
         // Stars visible
         if(starField) starField.visible = true;
         if(fireParticles) fireParticles.visible = true;
@@ -926,6 +933,13 @@ function toggleDayNight() {
         // Posisi matahari optimal untuk menerangi objek
         moonLight.position.set(30, 100, 80); 
         
+        // Update Sun Mesh Appearance
+        if(moonMesh) {
+            moonMesh.material.color.setHex(0xffaa00); // Bright Orange/Yellow Sun
+            moonMesh.position.copy(moonLight.position).normalize().multiplyScalar(400);
+            moonMesh.scale.set(1.5, 1.5, 1.5); // Bigger Sun
+        }
+
         // Stars invisible
         if(starField) starField.visible = false;
         if(fireParticles) fireParticles.visible = false;
