@@ -972,7 +972,7 @@ blocker.style.cssText =
   "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; font-family: Segoe UI, sans-serif; color: white;";
 
 blocker.innerHTML =
-  '<h1 style="font-size: 48px; margin-bottom: 10px; color: #ff6b35;">OGOH-OGOH WORLD</h1><p id="modeText" style="font-size: 18px; color: #aaa; margin-bottom: 30px;">Jelajahi dunia Ogoh-ogoh saat malam Nyepi</p><button id="playBtn" style="padding: 15px 40px; font-size: 20px; background: linear-gradient(45deg, #ff6b35, #f7931e); border: none; border-radius: 10px; color: white; cursor: pointer; font-weight: bold;">MULAI JELAJAH</button><div style="margin-top: 40px; text-align: center; color: #888;"><p>WASD atau Arrow Keys - Bergerak</p><p>Shift - Lari (Sprint)</p><p>Mouse - Melihat sekeliling</p><p>Space - Lompat</p><p>[1] Musik | [2] Siang/Malam</p><p>Dekati Ogoh-ogoh untuk melihat info</p></div>';
+  '<h1 style="font-size: 48px; margin-bottom: 10px; color: #ff6b35;">FESTIVAL BUDAYA NYEPI</h1><p id="modeText" style="font-size: 18px; color: #aaa; margin-bottom: 30px;">Jelajahi Keindahan Budaya & Ogoh-ogoh</p><button id="playBtn" style="padding: 15px 40px; font-size: 20px; background: linear-gradient(45deg, #ff6b35, #f7931e); border: none; border-radius: 10px; color: white; cursor: pointer; font-weight: bold;">MULAI JELAJAH</button><div style="margin-top: 40px; text-align: center; color: #888;"><p>WASD atau Arrow Keys - Bergerak</p><p>Shift - Lari (Sprint)</p><p>Mouse - Melihat sekeliling</p><p>Space - Lompat</p><p>[1] Musik | [2] Siang/Malam</p><p>Dekati Objek Budaya untuk melihat info</p></div>';
 document.body.appendChild(blocker);
 
 document.getElementById("playBtn").addEventListener("click", () => {
@@ -992,7 +992,7 @@ const hud = document.createElement("div");
 hud.style.cssText =
   "position: fixed; top: 20px; left: 20px; padding: 15px 20px; background: rgba(0, 0, 0, 0.7); color: white; font-family: Segoe UI, sans-serif; border-radius: 10px; border-left: 4px solid #ff6b35; z-index: 100; display: none;";
 hud.innerHTML =
-  '<div style="font-size: 14px; color: #ff6b35; font-weight: bold;">OGOH-OGOH WORLD</div><div id="playerPos" style="font-size: 12px; margin-top: 5px; color: #aaa;">Posisi: 0, 0</div><div id="nearestOgoh" style="font-size: 12px; margin-top: 5px; color: #aaa;">Dekati Ogoh-ogoh...</div>';
+  '<div style="font-size: 14px; color: #ff6b35; font-weight: bold;">FESTIVAL NYEPI</div><div id="playerPos" style="font-size: 12px; margin-top: 5px; color: #aaa;">Posisi: 0, 0</div><div id="nearestOgoh" style="font-size: 12px; margin-top: 5px; color: #aaa;">Dekati Objek Budaya...</div>';
 document.body.appendChild(hud);
 
 // Crosshair
@@ -1137,7 +1137,7 @@ function toggleDayNight() {
         bloomPass.threshold = 0.2;
 
         // Text
-        if(modeText) modeText.innerText = "Jelajahi dunia Ogoh-ogoh saat malam Nyepi";
+        if(modeText) modeText.innerText = "Jelajahi Keindahan Budaya saat malam Nyepi";
         
     } else {
         // Switch to Day
@@ -1182,7 +1182,7 @@ function toggleDayNight() {
         bloomPass.threshold = 0.9;
 
         // Text
-        if(modeText) modeText.innerText = "Jelajahi dunia Ogoh-ogoh saat hari Nyepi";
+        if(modeText) modeText.innerText = "Jelajahi Keindahan Budaya saat hari Nyepi";
     }
 }
 
@@ -1231,7 +1231,7 @@ function checkProximity() {
       nearest.userData.originalY + Math.sin(Date.now() * 0.003) * 0.2;
   } else {
     currentNearestOgoh = null;
-    nearestInfo.innerHTML = "Dekati Ogoh-ogoh...";
+    nearestInfo.innerHTML = "Dekati Objek Budaya...";
     infoPanel.style.display = "none";
   }
 }
