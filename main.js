@@ -1326,10 +1326,63 @@ function loadReog() {
     }, undefined, (err) => console.error("Error loading Reog:", err));
 }
 
+// 3. Load Reog (Ex-Barongsai)
+function loadRangda() {
+    const x = 0;
+    const z = -40;
+    const yPos = 1; // Dinaikkan agar tidak tenggelam (karena scale besar)
+    
+    // Create Torches
+    createTorchLight(x + 5, 1, z + 5);
+    createTorchLight(x - 5, 1, z - 5);
+    createTorchLight(x + 5, 1, z - 5);
+    createTorchLight(x - 5, 1, z + 5);
+
+    loader.load('patung-rangda.glb', (gltf) => {
+        const model = gltf.scene;
+        model.position.set(x, yPos, z);
+        model.scale.set(10, 10, 10); // Diperbesar dari 3 ke 10
+        
+        // Check & Play Animation
+        if (gltf.animations && gltf.animations.length > 0) {
+            const mixer = new THREE.AnimationMixer(model);
+            const action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+            mixers.push(mixer);
+            console.log("Animation found for Reog");
+        }
+
+        model.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                
+                // Fix Lighting
+                if (child.material) {
+                    child.material.metalness = 0.1;
+                    child.material.roughness = 0.8;
+                    child.material.needsUpdate = true;
+                }
+            }
+        });
+        
+        model.userData = {
+            name: "Rangda",
+            description: "Ratu iblis dan ratu dari para leak (ilmu hitam) dalam mitologi Bali,",
+            originalY: yPos
+        };
+        
+        scene.add(model);
+        ogohOgohList.push(model);
+        console.log("Rangda loaded");
+    }, undefined, (err) => console.error("Error loading Rangda:", err));
+}
+
 // Execute Loaders
 loadBhutaKala();
 loadKuwera();
 loadReog();
+loadRangda();
 
 // =========================
 // PLAYER MOVEMENT SYSTEM (IMPROVED)
