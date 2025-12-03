@@ -866,6 +866,7 @@ document.body.appendChild(dayNightBtn);
 
 function toggleDayNight() {
     const starField = scene.getObjectByName("starField");
+    const fireParticles = scene.getObjectByName("fireParticles"); // Ambient fire particles
     const modeText = document.getElementById("modeText");
 
     if (isNight) {
@@ -882,10 +883,12 @@ function toggleDayNight() {
         
         // Stars visible
         if(starField) starField.visible = true;
+        if(fireParticles) fireParticles.visible = true;
         
         // Torches visible
         torchLights.forEach(l => l.visible = true);
         flameObjects.forEach(f => f.group.visible = true);
+        sparkParticles.forEach(p => p.mesh.visible = true);
         
         // Bloom strong
         bloomPass.strength = 0.8;
@@ -908,10 +911,12 @@ function toggleDayNight() {
         
         // Stars invisible
         if(starField) starField.visible = false;
+        if(fireParticles) fireParticles.visible = false;
         
         // Torches invisible (or just light off)
         torchLights.forEach(l => l.visible = false);
         flameObjects.forEach(f => f.group.visible = false);
+        sparkParticles.forEach(p => p.mesh.visible = false);
         
         // Bloom weak
         bloomPass.strength = 0.2;
