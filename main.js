@@ -400,17 +400,20 @@ function createPath() {
 
   const pathX = pathZ.clone();
   pathX.rotation.z = Math.PI / 2;
+  pathX.position.y = 0.07; // Sedikit lebih tinggi untuk menghindari Z-fighting di persimpangan
   scene.add(pathX);
 
   // Additional Roads for other statues
   // Road at Z=40 (Horizontal)
   const pathZ40 = pathX.clone();
   pathZ40.position.z = 40;
+  pathZ40.position.y = 0.07; // Sedikit lebih tinggi
   scene.add(pathZ40);
 
   // Road at X=-40 (Vertical)
   const pathXMin40 = pathZ.clone();
   pathXMin40.position.x = -40;
+  pathXMin40.position.y = 0.06; // Sama dengan pathZ (vertikal)
   scene.add(pathXMin40);
 }
 createPath();
