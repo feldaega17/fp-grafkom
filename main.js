@@ -876,10 +876,18 @@ function toggleDayNight() {
         scene.fog.color.setHex(0x050510);
         scene.fog.density = 0.002;
         
-        // Moon settings
+        // Lighting (Night) - Improved for visibility
+        ambientLight.color.setHex(0x1a1a30); // Sedikit lebih terang dari sebelumnya (Blue tint)
+        ambientLight.intensity = 0.4; // Naikkan agar tidak terlalu gelap gulita
+        
+        hemiLight.color.setHex(0x2a2a50); // Langit malam biru
+        hemiLight.groundColor.setHex(0x050510); // Tanah gelap
+        hemiLight.intensity = 0.4;
+
+        // Moon settings (Cold Blue)
         moonLight.color.setHex(0xaaccff);
-        moonLight.intensity = 2.5;
-        moonLight.position.set(50, 100, 50);
+        moonLight.intensity = 2.0; // Balance dengan ambient yang naik
+        moonLight.position.set(50, 100, 100); // Cahaya dari depan-atas-kanan
         
         // Stars visible
         if(starField) starField.visible = true;
@@ -902,25 +910,34 @@ function toggleDayNight() {
         dayNightBtn.innerText = "[2] Mode: Siang";
         scene.background = new THREE.Color(0x87CEEB); // Sky Blue
         scene.fog.color.setHex(0x87CEEB);
-        scene.fog.density = 0.001; // Less fog in day
+        scene.fog.density = 0.0008; // Kabut sangat tipis
         
-        // Sun settings
-        moonLight.color.setHex(0xffffee); // Warm Sun
-        moonLight.intensity = 5.0;
-        moonLight.position.set(-50, 200, -50); // Different angle
+        // Lighting (Day) - Bright & Clear
+        ambientLight.color.setHex(0xffffff);
+        ambientLight.intensity = 0.9; // Hampir penuh agar bayangan tidak hitam
+        
+        hemiLight.color.setHex(0xffffff); // Langit putih/biru cerah
+        hemiLight.groundColor.setHex(0x5d4037); // Pantulan tanah coklat
+        hemiLight.intensity = 0.8;
+
+        // Sun settings (Warm White)
+        moonLight.color.setHex(0xffffee); 
+        moonLight.intensity = 3.5; // Matahari terang
+        // Posisi matahari optimal untuk menerangi objek
+        moonLight.position.set(30, 100, 80); 
         
         // Stars invisible
         if(starField) starField.visible = false;
         if(fireParticles) fireParticles.visible = false;
         
-        // Torches invisible (or just light off)
+        // Torches invisible
         torchLights.forEach(l => l.visible = false);
         flameObjects.forEach(f => f.group.visible = false);
         sparkParticles.forEach(p => p.mesh.visible = false);
         
-        // Bloom weak
-        bloomPass.strength = 0.2;
-        bloomPass.threshold = 0.8;
+        // Bloom weak but present for sun glare
+        bloomPass.strength = 0.15;
+        bloomPass.threshold = 0.9;
 
         // Text
         if(modeText) modeText.innerText = "Jelajahi dunia Ogoh-ogoh saat hari Nyepi";
