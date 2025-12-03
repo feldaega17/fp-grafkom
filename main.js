@@ -200,8 +200,8 @@ scene.add(hemiLight);
 const moonLight = new THREE.DirectionalLight(0xaaccff, 2.5); // Intensity tinggi untuk tone mapping
 moonLight.position.set(50, 100, 50);
 moonLight.castShadow = true;
-moonLight.shadow.mapSize.width = 2048; // Resolusi Tinggi (2K) untuk menghilangkan kotak-kotak
-moonLight.shadow.mapSize.height = 2048;
+moonLight.shadow.mapSize.width = 1024; // OPTIMASI: 2048 -> 1024 (Cukup tajam untuk SoftShadow)
+moonLight.shadow.mapSize.height = 1024;
 moonLight.shadow.camera.near = 0.5;
 moonLight.shadow.camera.far = 500;
 moonLight.shadow.camera.left = -90; // Dipersempit sedikit agar lebih tajam
@@ -215,6 +215,21 @@ scene.add(moonLight);
 // Torch lights (obor) - Warm Orange
 const torchLights = []; // Array untuk animasi cahaya obor
 const sparkParticles = []; // Array untuk partikel percikan api
+
+// OPTIMIZATION: Shared Geometries & Materials
+const torchGeom = new THREE.CylinderGeometry(0.05, 0.08, 1.5, 5);
+const torchMat = new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 1.0, flatShading: true });
+
+const coreGeom = new THREE.OctahedronGeometry(0.1, 0);
+const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+const innerGeom = new THREE.OctahedronGeometry(0.2, 0);
+const innerMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+
+const outerGeom = new THREE.OctahedronGeometry(0.35, 0);
+const outerMat = new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending });
+
+const sparkGeom = new THREE.PlaneGeometry(0.05, 0.05);
 
 function createTorchLight(x, y, z, addLight = true) {
   // 1. PointLight (Cahaya Utama) - OPTIMIZED
@@ -234,12 +249,6 @@ function createTorchLight(x, y, z, addLight = true) {
   }
 
   // 2. Visual Obor (Batang Kayu)
-  const torchGeom = new THREE.CylinderGeometry(0.05, 0.08, 1.5, 5); // Reduced segments
-  const torchMat = new THREE.MeshStandardMaterial({ 
-    color: 0x2a1a0a,
-    roughness: 1.0,
-    flatShading: true // Low poly look
-  });
   const torch = new THREE.Mesh(torchGeom, torchMat);
   torch.position.set(x, y - 0.75, z);
   torch.castShadow = true;
@@ -250,30 +259,14 @@ function createTorchLight(x, y, z, addLight = true) {
   flameGroup.position.set(x, y + 0.2, z);
   
   // Layer 1: Core (Putih Panas)
-  const coreGeom = new THREE.OctahedronGeometry(0.1, 0); // Reduced detail
-  const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const core = new THREE.Mesh(coreGeom, coreMat);
   flameGroup.add(core);
 
   // Layer 2: Inner Flame (Kuning/Oranye Terang)
-  const innerGeom = new THREE.OctahedronGeometry(0.2, 0);
-  const innerMat = new THREE.MeshBasicMaterial({ 
-      color: 0xffaa00, 
-      transparent: true, 
-      opacity: 0.8,
-      blending: THREE.AdditiveBlending 
-  });
   const inner = new THREE.Mesh(innerGeom, innerMat);
   flameGroup.add(inner);
 
   // Layer 3: Outer Flame (Merah/Oranye Gelap)
-  const outerGeom = new THREE.OctahedronGeometry(0.35, 0); 
-  const outerMat = new THREE.MeshBasicMaterial({ 
-      color: 0xff4400, 
-      transparent: true, 
-      opacity: 0.4,
-      blending: THREE.AdditiveBlending
-  });
   const outer = new THREE.Mesh(outerGeom, outerMat);
   flameGroup.add(outer);
 
@@ -284,7 +277,7 @@ function createTorchLight(x, y, z, addLight = true) {
 
   // 4. Spark System (Percikan Api Sederhana)
   for(let i=0; i<2; i++) { // Reduced count further
-      const sparkGeom = new THREE.PlaneGeometry(0.05, 0.05);
+      // Material must be unique because opacity is animated individually
       const sparkMat = new THREE.MeshBasicMaterial({ 
           color: 0xffaa00, 
           side: THREE.DoubleSide,
