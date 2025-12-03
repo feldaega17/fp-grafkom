@@ -61,17 +61,21 @@ const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
   0.1,
-  1000
+  400 // Reduced Far Clip Plane (1000 -> 400)
 );
 camera.position.set(0, 2, 20);
 
-// Renderer (High Quality Setup)
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+// Renderer (High Performance Setup)
+const renderer = new THREE.WebGLRenderer({ 
+    antialias: false, // MATIKAN ANTIALIAS (Boost FPS signifikan)
+    powerPreference: "high-performance",
+    precision: "mediump" // Gunakan presisi medium untuk GPU mobile/low-end
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio untuk performa
+renderer.setPixelRatio(1); // PAKSA 1.0 (Jangan ikutin retina display)
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Shadow lebih halus
-renderer.toneMapping = THREE.ACESFilmicToneMapping; // KUNCI REALISME: Cinematic lighting
+renderer.shadowMap.type = THREE.PCFShadowMap; // Ganti ke PCF biasa (lebih ringan dari SoftShadow)
+renderer.toneMapping = THREE.ACESFilmicToneMapping; 
 renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
@@ -79,8 +83,8 @@ document.body.appendChild(renderer.domElement);
 const renderScene = new RenderPass(scene, camera);
 
 const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), // Optimized Resolution
-  1.5, // strength
+  new THREE.Vector2(window.innerWidth / 4, window.innerHeight / 4), // Quarter Resolution (Sangat ringan)
+  1.2, // strength (dikurangi sedikit)
   0.4, // radius
   0.85 // threshold
 );
@@ -111,8 +115,8 @@ scene.add(hemiLight);
 const moonLight = new THREE.DirectionalLight(0xaaccff, 2.5); // Intensity tinggi untuk tone mapping
 moonLight.position.set(50, 100, 50);
 moonLight.castShadow = true;
-moonLight.shadow.mapSize.width = 2048; // Optimized Shadow Map
-moonLight.shadow.mapSize.height = 2048;
+moonLight.shadow.mapSize.width = 1024; // Low Res Shadow (Cukup untuk malam)
+moonLight.shadow.mapSize.height = 1024;
 moonLight.shadow.camera.near = 0.5;
 moonLight.shadow.camera.far = 500;
 moonLight.shadow.camera.left = -100;
@@ -126,25 +130,29 @@ scene.add(moonLight);
 const torchLights = []; // Array untuk animasi cahaya obor
 const sparkParticles = []; // Array untuk partikel percikan api
 
-function createTorchLight(x, y, z) {
-  // 1. PointLight (Cahaya Utama)
-  const torchLight = new THREE.PointLight(0xff6600, 80, 20, 2); // Lebih terang & radius pas
-  torchLight.position.set(x, y + 0.8, z);
-  torchLight.castShadow = false; // Disable shadow to prevent shader limit errors (Invisible models)
-  // torchLight.shadow.bias = -0.0001;
-  // torchLight.shadow.mapSize.width = 1024; // Optimasi shadow map
-  // torchLight.shadow.mapSize.height = 1024;
-  scene.add(torchLight);
-  
-  // Simpan untuk animasi flicker
-  torchLight.userData = { baseIntensity: 80, phase: Math.random() * Math.PI * 2 };
-  torchLights.push(torchLight);
+function createTorchLight(x, y, z, addLight = true) {
+  // 1. PointLight (Cahaya Utama) - OPTIMIZED
+  let torchLight = null;
+  if (addLight) {
+      // Warna lebih natural (Orange-Kuning), bukan Merah-Orange pekat
+      // Intensitas dinaikkan sedikit (80 -> 100) untuk kompensasi jumlah lampu yang dikurangi
+      // Distance dinaikkan (20 -> 25) agar jangkauan lebih luas
+      torchLight = new THREE.PointLight(0xff8844, 100, 25, 2); 
+      torchLight.position.set(x, y + 0.8, z);
+      torchLight.castShadow = false; 
+      scene.add(torchLight);
+      
+      // Simpan untuk animasi flicker
+      torchLight.userData = { baseIntensity: 100, phase: Math.random() * Math.PI * 2 };
+      torchLights.push(torchLight);
+  }
 
   // 2. Visual Obor (Batang Kayu)
-  const torchGeom = new THREE.CylinderGeometry(0.05, 0.08, 1.5, 8);
+  const torchGeom = new THREE.CylinderGeometry(0.05, 0.08, 1.5, 5); // Reduced segments
   const torchMat = new THREE.MeshStandardMaterial({ 
     color: 0x2a1a0a,
-    roughness: 1.0 
+    roughness: 1.0,
+    flatShading: true // Low poly look
   });
   const torch = new THREE.Mesh(torchGeom, torchMat);
   torch.position.set(x, y - 0.75, z);
@@ -156,24 +164,24 @@ function createTorchLight(x, y, z) {
   flameGroup.position.set(x, y + 0.2, z);
   
   // Layer 1: Core (Putih Panas)
-  const coreGeom = new THREE.OctahedronGeometry(0.1, 2);
+  const coreGeom = new THREE.OctahedronGeometry(0.1, 0); // Reduced detail
   const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const core = new THREE.Mesh(coreGeom, coreMat);
   flameGroup.add(core);
 
   // Layer 2: Inner Flame (Kuning/Oranye Terang)
-  const innerGeom = new THREE.OctahedronGeometry(0.2, 1);
+  const innerGeom = new THREE.OctahedronGeometry(0.2, 0);
   const innerMat = new THREE.MeshBasicMaterial({ 
       color: 0xffaa00, 
       transparent: true, 
       opacity: 0.8,
-      blending: THREE.AdditiveBlending // Glowing effect
+      blending: THREE.AdditiveBlending 
   });
   const inner = new THREE.Mesh(innerGeom, innerMat);
   flameGroup.add(inner);
 
   // Layer 3: Outer Flame (Merah/Oranye Gelap)
-  const outerGeom = new THREE.OctahedronGeometry(0.35, 0); // Low poly look for outer
+  const outerGeom = new THREE.OctahedronGeometry(0.35, 0); 
   const outerMat = new THREE.MeshBasicMaterial({ 
       color: 0xff4400, 
       transparent: true, 
@@ -185,13 +193,11 @@ function createTorchLight(x, y, z) {
 
   scene.add(flameGroup);
 
-  // Simpan flame group untuk animasi
   flameGroup.userData = { phase: Math.random() * Math.PI * 2 };
   flameObjects.push({ group: flameGroup, core: core, inner: inner, outer: outer });
 
   // 4. Spark System (Percikan Api Sederhana)
-  // Kita buat beberapa partikel kecil yang akan bergerak ke atas
-  for(let i=0; i<3; i++) { // Reduced count
+  for(let i=0; i<2; i++) { // Reduced count further
       const sparkGeom = new THREE.PlaneGeometry(0.05, 0.05);
       const sparkMat = new THREE.MeshBasicMaterial({ 
           color: 0xffaa00, 
@@ -200,10 +206,9 @@ function createTorchLight(x, y, z) {
           opacity: 1
       });
       const spark = new THREE.Mesh(sparkGeom, sparkMat);
-      spark.castShadow = false; // Disable shadow for particles
+      spark.castShadow = false; 
       spark.receiveShadow = false;
       
-      // Random start position near flame
       resetSpark(spark, x, y, z);
       
       scene.add(spark);
@@ -433,7 +438,7 @@ createPath();
 let grassMaterial; // Global variable for animation
 
 function createGrass() {
-    const grassCount = 15000; // Increased density
+    const grassCount = 8000; // Optimized density for production
     const dummy = new THREE.Object3D();
     
     // Geometry: 2 planes intersecting for better volume from all angles
@@ -674,23 +679,20 @@ const sharedTrunkMat = new THREE.MeshStandardMaterial({
 
 const sharedLeavesMat = new THREE.MeshStandardMaterial({ 
     map: leafTexture,
-    color: 0xbbbbbb, // Tint base texture slightly
+    color: 0xbbbbbb, 
     roughness: 0.8,
-    bumpMap: leafTexture, // Use texture for depth
-    bumpScale: 0.5, // Deep texture
+    bumpMap: leafTexture, 
+    bumpScale: 0.5, 
     side: THREE.DoubleSide,
-    alphaTest: 0.3 // Cutout for sharper edges if we had alpha, but keeps it solid here
+    alphaTest: 0.3,
+    transparent: false // MATIKAN TRANSPARANSI (Sorting killer)
 });
 
-// Pohon Beringin (Banyan Tree) - Realistic Procedural (OPTIMIZED)
-function createTree(x, z) {
-  const treeGroup = new THREE.Group();
-  treeGroup.position.set(x, 0, z);
-
+// Pohon Beringin (Banyan Tree) - Realistic Procedural (OPTIMIZED - GLOBAL MERGE)
+function getTreeGeometries(x, z) {
   // Randomize size
   const scale = 1.5 + Math.random() * 1.0; 
-  treeGroup.scale.set(scale, scale, scale);
-
+  
   const trunkGeometries = [];
   const leafGeometries = [];
 
@@ -699,7 +701,7 @@ function createTree(x, z) {
   const trunkRadius = 0.6 + Math.random() * 0.4;
   
   // Central core
-  const coreGeom = new THREE.CylinderGeometry(trunkRadius * 0.8, trunkRadius, trunkHeight, 8);
+  const coreGeom = new THREE.CylinderGeometry(trunkRadius * 0.8, trunkRadius, trunkHeight, 5); // Reduced segments
   coreGeom.translate(0, trunkHeight / 2, 0);
   trunkGeometries.push(coreGeom);
 
@@ -708,7 +710,7 @@ function createTree(x, z) {
   for(let i=0; i<rootCount; i++) {
       const r = 0.15 + Math.random() * 0.2;
       const h = trunkHeight * (0.9 + Math.random() * 0.2);
-      const rootGeom = new THREE.CylinderGeometry(r, r + 0.15, h, 5);
+      const rootGeom = new THREE.CylinderGeometry(r, r + 0.15, h, 4); // Reduced segments
       
       // Wiggle
       const posAttribute = rootGeom.attributes.position;
@@ -837,38 +839,43 @@ function createTree(x, z) {
   topGeom.translate(0, trunkHeight + 1, 0);
   leafGeometries.push(topGeom);
 
-  // MERGE WITH VALIDATION
+  // MERGE LOCAL PARTS FIRST
+  let mergedTrunk = null;
+  let mergedLeaves = null;
+
   if (trunkGeometries.length > 0) {
       const validTrunks = trunkGeometries.filter(g => g && g.getAttribute('position'));
       if (validTrunks.length > 0) {
-          const mergedTrunk = BufferGeometryUtils.mergeGeometries(validTrunks);
-          if (mergedTrunk) {
-              const trunkMesh = new THREE.Mesh(mergedTrunk, sharedTrunkMat);
-              trunkMesh.castShadow = true;
-              trunkMesh.receiveShadow = true;
-              treeGroup.add(trunkMesh);
-          }
+          mergedTrunk = BufferGeometryUtils.mergeGeometries(validTrunks);
       }
   }
   
   if (leafGeometries.length > 0) {
       const validLeaves = leafGeometries.filter(g => g && g.getAttribute('position'));
       if (validLeaves.length > 0) {
-          const mergedLeaves = BufferGeometryUtils.mergeGeometries(validLeaves);
-          if (mergedLeaves) {
-              const leavesMesh = new THREE.Mesh(mergedLeaves, sharedLeavesMat);
-              leavesMesh.castShadow = true;
-              leavesMesh.receiveShadow = true;
-              treeGroup.add(leavesMesh);
-          }
+          mergedLeaves = BufferGeometryUtils.mergeGeometries(validLeaves);
       }
   }
 
-  scene.add(treeGroup);
+  // APPLY WORLD TRANSFORM (Scale & Position)
+  if (mergedTrunk) {
+      mergedTrunk.scale(scale, scale, scale);
+      mergedTrunk.translate(x, 0, z);
+  }
+  if (mergedLeaves) {
+      mergedLeaves.scale(scale, scale, scale);
+      mergedLeaves.translate(x, 0, z);
+  }
+
+  return { trunk: mergedTrunk, leaves: mergedLeaves };
 }
 
 // Store tree positions for falling leaves
 const treePositions = [];
+
+// GLOBAL ARRAYS FOR MERGING
+const allTrunkGeometries = [];
+const allLeafGeometries = [];
 
 // Spawn pohon random
 for (let i = 0; i < 40; i++) { // Tambah jumlah pohon
@@ -886,9 +893,32 @@ for (let i = 0; i < 40; i++) { // Tambah jumlah pohon
   const onPathXMin40 = Math.abs(x + 40) < safeZone;
   
   if (!onMainCross && !onPathZ40 && !onPathXMin40) {
-    createTree(x, z);
+    const { trunk, leaves } = getTreeGeometries(x, z);
+    if (trunk) allTrunkGeometries.push(trunk);
+    if (leaves) allLeafGeometries.push(leaves);
     treePositions.push({x, z});
   }
+}
+
+// FINAL MERGE FOR TREES (Massive Draw Call Reduction)
+if (allTrunkGeometries.length > 0) {
+    const finalTrunkGeom = BufferGeometryUtils.mergeGeometries(allTrunkGeometries);
+    if (finalTrunkGeom) {
+        const trunkMesh = new THREE.Mesh(finalTrunkGeom, sharedTrunkMat);
+        trunkMesh.castShadow = true;
+        trunkMesh.receiveShadow = true;
+        scene.add(trunkMesh);
+    }
+}
+
+if (allLeafGeometries.length > 0) {
+    const finalLeafGeom = BufferGeometryUtils.mergeGeometries(allLeafGeometries);
+    if (finalLeafGeom) {
+        const leavesMesh = new THREE.Mesh(finalLeafGeom, sharedLeavesMat);
+        leavesMesh.castShadow = true;
+        leavesMesh.receiveShadow = true;
+        scene.add(leavesMesh);
+    }
 }
 
 // Batu dekorasi (Improved Rock Material)
@@ -1002,13 +1032,10 @@ const ruinMat = new THREE.MeshStandardMaterial({
     color: 0x888888
 });
 
-function createTempleRuins(x, z) {
-    const group = new THREE.Group();
-    
+function getRuinsGeometries(x, z) {
     // 1. Hitung ketinggian tanah di posisi ini agar tidak melayang
     const terrainHeightEstimate = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 0.5;
-    
-    group.position.set(x, terrainHeightEstimate - 0.2, z); // Tanamkan 0.2 unit ke bawah
+    const yBase = terrainHeightEstimate - 0.2;
     
     const type = Math.floor(Math.random() * 3); // 0: Pillar, 1: Wall, 2: Rubble
     const geometries = [];
@@ -1021,7 +1048,7 @@ function createTempleRuins(x, z) {
         
         // Pillar
         const height = 1.0 + Math.random() * 2.0;
-        const pillarGeom = new THREE.CylinderGeometry(0.4, 0.4, height, 16);
+        const pillarGeom = new THREE.CylinderGeometry(0.4, 0.4, height, 8); // Reduced segments
         
         // Tilt slightly if it's short (broken)
         if (Math.random() > 0.5) {
@@ -1113,23 +1140,28 @@ function createTempleRuins(x, z) {
         }
     }
     
+    // MERGE LOCAL
+    let mergedGeom = null;
     if (geometries.length > 0) {
         const validGeoms = geometries.filter(g => g && g.getAttribute('position'));
         if (validGeoms.length > 0) {
-            const mergedGeom = BufferGeometryUtils.mergeGeometries(validGeoms);
-            if (mergedGeom) {
-                const mesh = new THREE.Mesh(mergedGeom, ruinMat);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                group.add(mesh);
-            }
+            mergedGeom = BufferGeometryUtils.mergeGeometries(validGeoms);
         }
     }
     
-    // Random rotation for the whole group
-    group.rotation.y = Math.random() * Math.PI * 2;
-    scene.add(group);
+    // APPLY WORLD TRANSFORM
+    if (mergedGeom) {
+        // Random rotation Y
+        mergedGeom.rotateY(Math.random() * Math.PI * 2);
+        // Translate to world pos
+        mergedGeom.translate(x, yBase, z);
+    }
+    
+    return mergedGeom;
 }
+
+// GLOBAL ARRAY FOR RUINS
+const allRuinGeometries = [];
 
 // Spawn Ruins Randomly
 for (let i = 0; i < 20; i++) {
@@ -1142,7 +1174,8 @@ for (let i = 0; i < 20; i++) {
   const onPathXMin40 = Math.abs(x + 40) < 6;
   
   if (!onMainCross && !onPathZ40 && !onPathXMin40) {
-    createTempleRuins(x, z);
+    const geom = getRuinsGeometries(x, z);
+    if(geom) allRuinGeometries.push(geom);
   }
 }
 
@@ -1161,7 +1194,8 @@ function spawnRuinsAround(centerX, centerZ, count, radius) {
         const onPathXMin40 = Math.abs(x + 40) < 5;
 
         if (!onMainCross && !onPathZ40 && !onPathXMin40) {
-             createTempleRuins(x, z);
+             const geom = getRuinsGeometries(x, z);
+             if(geom) allRuinGeometries.push(geom);
         }
     }
 }
@@ -1170,6 +1204,17 @@ function spawnRuinsAround(centerX, centerZ, count, radius) {
 spawnRuinsAround(0, 0, 8, 25);    // Bhuta Kala (Center)
 spawnRuinsAround(0, 40, 6, 20);   // Kuwera Punia
 spawnRuinsAround(-40, 0, 6, 20);  // Reog Ponorogo
+
+// FINAL MERGE FOR RUINS
+if (allRuinGeometries.length > 0) {
+    const finalRuinGeom = BufferGeometryUtils.mergeGeometries(allRuinGeometries);
+    if (finalRuinGeom) {
+        const ruinsMesh = new THREE.Mesh(finalRuinGeom, ruinMat);
+        ruinsMesh.castShadow = true;
+        ruinsMesh.receiveShadow = true;
+        scene.add(ruinsMesh);
+    }
+}
 
 // MOON MESH (Visual Representation of Light Source)
 const moonGeom = new THREE.SphereGeometry(5, 32, 32);
@@ -1193,11 +1238,12 @@ function loadBhutaKala() {
     const z = 0;
     const yPos = 3;
     
-    // Create Torches
-    createTorchLight(x + 8, 1, z + 8);
-    createTorchLight(x - 8, 1, z - 8);
-    createTorchLight(x + 8, 1, z - 8);
-    createTorchLight(x - 8, 1, z + 8);
+    // OPTIMASI: Gunakan 2 Lampu Diagonal (Cukup untuk menerangi 4 sisi secara visual)
+    // Hemat 50% performa lighting dibanding 4 lampu
+    createTorchLight(x + 8, 1, z + 8, true);  // Light ON (Depan Kanan)
+    createTorchLight(x - 8, 1, z - 8, true);  // Light ON (Belakang Kiri)
+    createTorchLight(x + 8, 1, z - 8, false); // Visual Only
+    createTorchLight(x - 8, 1, z + 8, false); // Visual Only
 
     loader.load('ogoh.glb', (gltf) => {
         const model = gltf.scene;
@@ -1244,13 +1290,13 @@ function loadBhutaKala() {
 function loadKuwera() {
     const x = 0;
     const z = 40;
-    const yPos = 0; // Adjust based on model
+    const yPos = 0; 
     
-    // Create Torches
-    createTorchLight(x + 5, 1, z + 5);
-    createTorchLight(x - 5, 1, z - 5);
-    createTorchLight(x + 5, 1, z - 5);
-    createTorchLight(x - 5, 1, z + 5);
+    // OPTIMASI: 2 Lampu Diagonal
+    createTorchLight(x + 5, 1, z + 5, true);  // Light ON
+    createTorchLight(x - 5, 1, z - 5, true);  // Light ON
+    createTorchLight(x + 5, 1, z - 5, false); // Visual Only
+    createTorchLight(x - 5, 1, z + 5, false); // Visual Only
 
     loader.load('kuwera_punia.glb', (gltf) => {
         const model = gltf.scene;
@@ -1304,13 +1350,13 @@ function loadKuwera() {
 function loadReog() {
     const x = -40;
     const z = 0;
-    const yPos = 5; // Dinaikkan agar tidak tenggelam (karena scale besar)
+    const yPos = 5; 
     
-    // Create Torches
-    createTorchLight(x + 5, 1, z + 5);
-    createTorchLight(x - 5, 1, z - 5);
-    createTorchLight(x + 5, 1, z - 5);
-    createTorchLight(x - 5, 1, z + 5);
+    // OPTIMASI: 2 Lampu Diagonal
+    createTorchLight(x + 5, 1, z + 5, true);  // Light ON
+    createTorchLight(x - 5, 1, z - 5, true);  // Light ON
+    createTorchLight(x + 5, 1, z - 5, false); // Visual Only
+    createTorchLight(x - 5, 1, z + 5, false); // Visual Only
 
     loader.load('reog.glb', (gltf) => {
         const model = gltf.scene;
@@ -1358,11 +1404,11 @@ function loadRangda() {
     const z = -40;
     const yPos = 1; // Dinaikkan agar tidak tenggelam (karena scale besar)
     
-    // Create Torches
-    createTorchLight(x + 5, 1, z + 5);
-    createTorchLight(x - 5, 1, z - 5);
-    createTorchLight(x + 5, 1, z - 5);
-    createTorchLight(x - 5, 1, z + 5);
+    // OPTIMASI: 2 Lampu Diagonal
+    createTorchLight(x + 5, 1, z + 5, true);  // Light ON
+    createTorchLight(x - 5, 1, z - 5, true);  // Light ON
+    createTorchLight(x + 5, 1, z - 5, false); // Visual Only
+    createTorchLight(x - 5, 1, z + 5, false); // Visual Only
 
     loader.load('patung-rangda.glb', (gltf) => {
         const model = gltf.scene;
@@ -1850,7 +1896,7 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
-  bloomPass.resolution.set(window.innerWidth / 2, window.innerHeight / 2); // Update bloom resolution
+  bloomPass.resolution.set(window.innerWidth / 4, window.innerHeight / 4); // Update bloom resolution
 });
 
 // =========================
