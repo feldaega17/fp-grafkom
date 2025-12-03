@@ -1408,10 +1408,10 @@ function loadReog() {
     }, undefined, (err) => console.error("Error loading Reog:", err));
 }
 
-// 3. Load Reog (Ex-Barongsai)
+// 4. Load Rangda
 function loadRangda() {
-    const x = 0;
-    const z = -40;
+    const x = -40; // Pindah ke persimpangan pojok (Strategic Location)
+    const z = 40;
     const yPos = 1; // Dinaikkan agar tidak tenggelam (karena scale besar)
     
     // OPTIMASI: 2 Lampu Diagonal
