@@ -129,10 +129,10 @@ function createTorchLight(x, y, z) {
   // 1. PointLight (Cahaya Utama)
   const torchLight = new THREE.PointLight(0xff6600, 80, 20, 2); // Lebih terang & radius pas
   torchLight.position.set(x, y + 0.8, z);
-  torchLight.castShadow = true;
-  torchLight.shadow.bias = -0.0001;
-  torchLight.shadow.mapSize.width = 1024; // Optimasi shadow map
-  torchLight.shadow.mapSize.height = 1024;
+  torchLight.castShadow = false; // Disable shadow to prevent shader limit errors (Invisible models)
+  // torchLight.shadow.bias = -0.0001;
+  // torchLight.shadow.mapSize.width = 1024; // Optimasi shadow map
+  // torchLight.shadow.mapSize.height = 1024;
   scene.add(torchLight);
   
   // Simpan untuk animasi flicker
@@ -323,7 +323,7 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Jalan setapak (Improved Visuals)
+// Jalan setapak (Improved Visuals - Grid System)
 function createPath() {
   // Texture untuk jalan (Dirt Road)
   const pathCanvas = document.createElement('canvas');
@@ -359,17 +359,27 @@ function createPath() {
     polygonOffsetFactor: -1 // Mencegah z-fighting
   });
   
-  const path = new THREE.Mesh(pathGeom, pathMat);
-  path.rotation.x = -Math.PI / 2;
-  path.position.y = 0.06; // Sedikit di atas tanah yang sudah di-flatten (0.05)
-  path.receiveShadow = true;
-  scene.add(path);
+  // Main Cross (0,0)
+  const pathZ = new THREE.Mesh(pathGeom, pathMat);
+  pathZ.rotation.x = -Math.PI / 2;
+  pathZ.position.y = 0.06;
+  pathZ.receiveShadow = true;
+  scene.add(pathZ);
 
-  // Path horizontal
-  const path2 = path.clone();
-  path2.rotation.z = Math.PI / 2;
-  path2.receiveShadow = true;
-  scene.add(path2);
+  const pathX = pathZ.clone();
+  pathX.rotation.z = Math.PI / 2;
+  scene.add(pathX);
+
+  // Additional Roads for other statues
+  // Road at Z=40 (Horizontal)
+  const pathZ40 = pathX.clone();
+  pathZ40.position.z = 40;
+  scene.add(pathZ40);
+
+  // Road at X=-40 (Vertical)
+  const pathXMin40 = pathZ.clone();
+  pathXMin40.position.x = -40;
+  scene.add(pathXMin40);
 }
 createPath();
 
@@ -603,64 +613,141 @@ scene.add(moonMesh);
 const loader = new GLTFLoader();
 const ogohOgohList = [];
 
-// Lokasi spawn Ogoh-ogoh (hanya 1 untuk optimasi)
-const ogohLocations = [
-  {
-    x: 0,
-    z: 0,
-    scale: 5,
-    name: "Bhuta Kala",
-    desc: "Raksasa penguasa waktu dan kematian",
-  },
-];
+// 1. Load Bhuta Kala (Ogoh-ogoh Utama)
+function loadBhutaKala() {
+    const x = 0;
+    const z = 0;
+    const yPos = 3;
+    
+    // Create Torches
+    createTorchLight(x + 8, 1, z + 8);
+    createTorchLight(x - 8, 1, z - 8);
+    createTorchLight(x + 8, 1, z - 8);
+    createTorchLight(x - 8, 1, z + 8);
 
-function loadOgohOgoh(location, index) {
-  const yPos = 3; // Posisi Y lebih tinggi
-
-  loader.load(
-    "/ogoh.glb",
-    (gltf) => {
-      const ogoh = gltf.scene;
-      ogoh.position.set(location.x, yPos, location.z);
-      ogoh.scale.set(location.scale, location.scale, location.scale);
-
-      // Random rotation
-      ogoh.rotation.y = Math.random() * Math.PI * 2;
-
-      ogoh.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
-      });
-
-      scene.add(ogoh);
-
-      // Data untuk interaksi
-      ogoh.userData = {
-        name: location.name,
-        description: location.desc,
-        index: index,
-        originalY: yPos,
-      };
-
-      ogohOgohList.push(ogoh);
-
-      // Tambah obor di sekitar (lowered to ground level, away from road)
-      createTorchLight(location.x + 8, 1, location.z + 8);
-      createTorchLight(location.x - 8, 1, location.z - 8);
-      createTorchLight(location.x + 8, 1, location.z - 8);
-      createTorchLight(location.x - 8, 1, location.z + 8);
-
-      console.log("Ogoh-ogoh loaded:", location.name);
-    },
-    undefined,
-    (err) => console.error("Failed to load Ogoh-ogoh:", err)
-  );
+    loader.load('ogoh.glb', (gltf) => {
+        const model = gltf.scene;
+        model.position.set(x, yPos, z);
+        model.scale.set(5, 5, 5);
+        model.rotation.y = 3 * Math.PI / 2; // Diputar 180 derajat dari posisi sebelumnya (90 -> 270)
+        
+        model.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                
+                // Fix Lighting
+                if (child.material) {
+                    child.material.metalness = 0.1;
+                    child.material.roughness = 0.8;
+                    child.material.needsUpdate = true;
+                }
+            }
+        });
+        
+        model.userData = {
+            name: "Bhuta Kala",
+            description: "Raksasa penguasa waktu dan kematian",
+            originalY: yPos
+        };
+        
+        scene.add(model);
+        ogohOgohList.push(model);
+        console.log("Bhuta Kala loaded");
+    }, undefined, (err) => console.error("Error loading Bhuta Kala:", err));
 }
 
-// Load semua Ogoh-ogoh
-ogohLocations.forEach((loc, i) => loadOgohOgoh(loc, i));
+// 2. Load Kuwera Punia
+function loadKuwera() {
+    const x = 0;
+    const z = 40;
+    const yPos = 0; // Adjust based on model
+    
+    // Create Torches
+    createTorchLight(x + 5, 1, z + 5);
+    createTorchLight(x - 5, 1, z - 5);
+    createTorchLight(x + 5, 1, z - 5);
+    createTorchLight(x - 5, 1, z + 5);
+
+    loader.load('kuwera_punia.glb', (gltf) => {
+        const model = gltf.scene;
+        model.position.set(x, yPos, z);
+        model.scale.set(3, 3, 3); // Diperbesar dari 0.03 ke 5
+        model.rotation.y = Math.PI; // Putar 180 derajat
+        
+        model.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                
+                // Fix Lighting
+                if (child.material) {
+                    child.material.metalness = 0.0;
+                    child.material.roughness = 0.8;
+                    child.material.needsUpdate = true;
+                }
+            }
+        });
+        
+        model.userData = {
+            name: "Kuwera Punia",
+            description: "Simbol kemakmuran dan kesejahteraan",
+            originalY: yPos
+        };
+        
+        scene.add(model);
+        ogohOgohList.push(model);
+        console.log("Kuwera loaded");
+    }, undefined, (err) => console.error("Error loading Kuwera:", err));
+}
+
+// 3. Load Reog (Ex-Barongsai)
+function loadReog() {
+    const x = -40;
+    const z = 0;
+    const yPos = 5; // Dinaikkan agar tidak tenggelam (karena scale besar)
+    
+    // Create Torches
+    createTorchLight(x + 5, 1, z + 5);
+    createTorchLight(x - 5, 1, z - 5);
+    createTorchLight(x + 5, 1, z - 5);
+    createTorchLight(x - 5, 1, z + 5);
+
+    loader.load('reog.glb', (gltf) => {
+        const model = gltf.scene;
+        model.position.set(x, yPos, z);
+        model.scale.set(10, 10, 10); // Diperbesar dari 3 ke 10
+        
+        model.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                
+                // Fix Lighting
+                if (child.material) {
+                    child.material.metalness = 0.1;
+                    child.material.roughness = 0.8;
+                    child.material.needsUpdate = true;
+                }
+            }
+        });
+        
+        model.userData = {
+            name: "Reog Ponorogo",
+            description: "Semangat pelindung dan keberuntungan",
+            originalY: yPos
+        };
+        
+        scene.add(model);
+        ogohOgohList.push(model);
+        console.log("Reog loaded");
+    }, undefined, (err) => console.error("Error loading Reog:", err));
+}
+
+// Execute Loaders
+loadBhutaKala();
+loadKuwera();
+loadReog();
 
 // =========================
 // PLAYER MOVEMENT SYSTEM (IMPROVED)
