@@ -28,6 +28,15 @@ import { PointerLockControls } from "three/addons/controls/PointerLockControls.j
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 
+// ASSETS IMPORT (Vite will resolve these to correct URLs)
+import ogohUrl from './assets/ogoh.glb?url';
+import kuweraUrl from './assets/kuwera_punia.glb?url';
+import reogUrl from './assets/reog.glb?url';
+import rangdaUrl from './assets/patung-rangda.glb?url';
+import gamelanUrl from './assets/gamelan-bali.mp3?url';
+import stepUrl from './assets/step.m4a?url';
+import hitUrl from './assets/hit.mp3?url';
+
 // =========================
 // PHYSICS & COLLISION SYSTEM (MINECRAFT STYLE)
 // =========================
@@ -1328,7 +1337,7 @@ function loadBhutaKala() {
     createTorchLight(x + 8, 1, z + 8, true);  // Light ON (Depan Kanan)
     createTorchLight(x - 8, 1, z - 8, true);  // Light ON (Belakang Kiri)
 
-    loader.load('./ogoh.glb', (gltf) => {
+    loader.load(ogohUrl, (gltf) => {
         const model = gltf.scene;
         model.position.set(x, yPos, z);
         model.scale.set(5, 5, 5);
@@ -1383,7 +1392,7 @@ function loadKuwera() {
     createTorchLight(x + 5, 1, z + 5, true);  // Light ON
     createTorchLight(x - 5, 1, z - 5, true);  // Light ON
 
-    loader.load('./kuwera_punia.glb', (gltf) => {
+    loader.load(kuweraUrl, (gltf) => {
         const model = gltf.scene;
         model.position.set(x, yPos, z);
         model.scale.set(3, 3, 3); // Diperbesar dari 0.03 ke 5
@@ -1445,7 +1454,7 @@ function loadReog() {
     createTorchLight(x + 5, 1, z + 5, true);  // Light ON
     createTorchLight(x - 5, 1, z - 5, true);  // Light ON
 
-    loader.load('./reog.glb', (gltf) => {
+    loader.load(reogUrl, (gltf) => {
         const model = gltf.scene;
         model.position.set(x, yPos, z);
         model.scale.set(10, 10, 10); // Diperbesar dari 3 ke 10
@@ -1499,7 +1508,7 @@ function loadRangda() {
     createTorchLight(x + 5, 1, z + 5, true);  // Light ON
     createTorchLight(x - 5, 1, z - 5, true);  // Light ON
 
-    loader.load('./patung-rangda.glb', (gltf) => {
+    loader.load(rangdaUrl, (gltf) => {
         const model = gltf.scene;
         model.position.set(x, yPos, z);
         model.scale.set(6, 6, 6); // Diperbesar dari 3 ke 10
@@ -1737,21 +1746,21 @@ const hitSound = new THREE.Audio(listener);
 const audioLoader = new THREE.AudioLoader();
 
 // 1. Background Music
-audioLoader.load("./gamelan-bali.mp3", (buffer) => {
+audioLoader.load(gamelanUrl, (buffer) => {
   bgMusic.setBuffer(buffer);
   bgMusic.setLoop(true);
   bgMusic.setVolume(0.3);
 });
 
 // 2. Step Sound (Minecraft Style)
-audioLoader.load("./step.m4a", (buffer) => {
+audioLoader.load(stepUrl, (buffer) => {
   stepSound.setBuffer(buffer);
   stepSound.setLoop(false);
   stepSound.setVolume(1.2); // Volume ditingkatkan (Boosted)
 });
 
 // 3. Hit Sound (Minecraft Style)
-audioLoader.load("./hit.mp3", (buffer) => {
+audioLoader.load(hitUrl, (buffer) => {
   hitSound.setBuffer(buffer);
   hitSound.setLoop(false);
   hitSound.setVolume(0.2); // Volume dikurangi
