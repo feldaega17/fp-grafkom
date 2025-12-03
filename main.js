@@ -1,3 +1,27 @@
+/**
+ * OPTIMIZATION SUMMARY (PRODUCTION LEVEL):
+ * 1. Renderer:
+ *    - Antialias: OFF
+ *    - Precision: mediump (Mobile friendly)
+ *    - PixelRatio: Fixed at 1.0 (Ignore Retina/High-DPI)
+ *    - PowerPreference: high-performance
+ * 
+ * 2. Lighting & Shadows:
+ *    - ShadowMap Type: PCFShadowMap (Hardware accelerated)
+ *    - ShadowMap Size: 512x512 (Ultra Low Res)
+ *    - Shadow Casters: Only MoonLight (Directional). TorchLights do NOT cast shadows.
+ *    - Torch Lights: 2 Active + 2 Visual per model (Diagonal Setup).
+ * 
+ * 3. Post-Processing (Bloom):
+ *    - Resolution: 1/8 of Screen Size (Very fast)
+ *    - Radius: 0.2 (Tight glow)
+ *    - Threshold: 0.2
+ * 
+ * 4. Materials & Textures:
+ *    - Environment: MeshLambertMaterial (Gouraud Shading - Cheapest)
+ *    - Textures: Generated at low res (128px - 512px)
+ *    - Geometry: Merged (Trees, Ruins) & Instanced (Grass)
+ */
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
@@ -83,13 +107,13 @@ document.body.appendChild(renderer.domElement);
 const renderScene = new RenderPass(scene, camera);
 
 const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth / 4, window.innerHeight / 4), // Quarter Resolution (Sangat ringan)
-  1.2, // strength (dikurangi sedikit)
-  0.4, // radius
+  new THREE.Vector2(window.innerWidth / 8, window.innerHeight / 8), // 1/8 Resolution (Ultra Performance)
+  1.0, // strength (dikurangi agar tidak terlalu blur di resolusi rendah)
+  0.2, // radius (dikurangi)
   0.85 // threshold
 );
-bloomPass.strength = 0.8; // Intensitas glow
-bloomPass.radius = 0.5; // Sebaran glow
+bloomPass.strength = 0.6; // Intensitas glow
+bloomPass.radius = 0.2; // Sebaran glow
 bloomPass.threshold = 0.2; // Batas cahaya yang kena glow
 
 const composer = new EffectComposer(renderer);
@@ -115,8 +139,8 @@ scene.add(hemiLight);
 const moonLight = new THREE.DirectionalLight(0xaaccff, 2.5); // Intensity tinggi untuk tone mapping
 moonLight.position.set(50, 100, 50);
 moonLight.castShadow = true;
-moonLight.shadow.mapSize.width = 1024; // Low Res Shadow (Cukup untuk malam)
-moonLight.shadow.mapSize.height = 1024;
+moonLight.shadow.mapSize.width = 512; // Ultra Low Res Shadow
+moonLight.shadow.mapSize.height = 512;
 moonLight.shadow.camera.near = 0.5;
 moonLight.shadow.camera.far = 500;
 moonLight.shadow.camera.left = -100;
@@ -1882,7 +1906,7 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
-  bloomPass.resolution.set(window.innerWidth / 4, window.innerHeight / 4); // Update bloom resolution
+  bloomPass.resolution.set(window.innerWidth / 8, window.innerHeight / 8); // Update bloom resolution
 });
 
 // =========================
