@@ -671,10 +671,12 @@ const playerState = {
   moveBackward: false,
   moveLeft: false,
   moveRight: false,
+  isSprinting: false, // Status lari
   canJump: true,
   velocity: new THREE.Vector3(),
   direction: new THREE.Vector3(),
-  speed: 12, // Sedikit lebih lambat agar terasa berat/realistis
+  speed: 12, // Kecepatan jalan normal
+  sprintSpeed: 25, // Kecepatan lari
   jumpHeight: 10,
   bobTimer: 0, // Untuk head bobbing
   defaultCameraY: 2 // Tinggi mata default
@@ -698,6 +700,10 @@ document.addEventListener("keydown", (e) => {
     case "KeyD":
     case "ArrowRight":
       playerState.moveRight = true;
+      break;
+    case "ShiftLeft":
+    case "ShiftRight":
+      playerState.isSprinting = true;
       break;
     case "Space":
       if (playerState.canJump) {
@@ -733,6 +739,10 @@ document.addEventListener("keyup", (e) => {
     case "ArrowRight":
       playerState.moveRight = false;
       break;
+    case "ShiftLeft":
+    case "ShiftRight":
+      playerState.isSprinting = false;
+      break;
   }
 });
 
@@ -747,7 +757,7 @@ blocker.style.cssText =
   "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; font-family: Segoe UI, sans-serif; color: white;";
 
 blocker.innerHTML =
-  '<h1 style="font-size: 48px; margin-bottom: 10px; color: #ff6b35;">OGOH-OGOH WORLD</h1><p id="modeText" style="font-size: 18px; color: #aaa; margin-bottom: 30px;">Jelajahi dunia Ogoh-ogoh saat malam Nyepi</p><button id="playBtn" style="padding: 15px 40px; font-size: 20px; background: linear-gradient(45deg, #ff6b35, #f7931e); border: none; border-radius: 10px; color: white; cursor: pointer; font-weight: bold;">MULAI JELAJAH</button><div style="margin-top: 40px; text-align: center; color: #888;"><p>WASD atau Arrow Keys - Bergerak</p><p>Mouse - Melihat sekeliling</p><p>Space - Lompat</p><p>Dekati Ogoh-ogoh untuk melihat info</p></div>';
+  '<h1 style="font-size: 48px; margin-bottom: 10px; color: #ff6b35;">OGOH-OGOH WORLD</h1><p id="modeText" style="font-size: 18px; color: #aaa; margin-bottom: 30px;">Jelajahi dunia Ogoh-ogoh saat malam Nyepi</p><button id="playBtn" style="padding: 15px 40px; font-size: 20px; background: linear-gradient(45deg, #ff6b35, #f7931e); border: none; border-radius: 10px; color: white; cursor: pointer; font-weight: bold;">MULAI JELAJAH</button><div style="margin-top: 40px; text-align: center; color: #888;"><p>WASD atau Arrow Keys - Bergerak</p><p>Shift - Lari (Sprint)</p><p>Mouse - Melihat sekeliling</p><p>Space - Lompat</p><p>[1] Musik | [2] Siang/Malam</p><p>Dekati Ogoh-ogoh untuk melihat info</p></div>';
 document.body.appendChild(blocker);
 
 document.getElementById("playBtn").addEventListener("click", () => {
@@ -1099,7 +1109,7 @@ function animate() {
     }
 
     // Terminal Velocity Cap
-    const maxSpeed = playerState.speed;
+    const maxSpeed = playerState.isSprinting ? playerState.sprintSpeed : playerState.speed;
     const currentSpeed = Math.sqrt(playerState.velocity.x**2 + playerState.velocity.z**2);
     if (currentSpeed > maxSpeed) {
         const ratio = maxSpeed / currentSpeed;
