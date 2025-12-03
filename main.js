@@ -1328,7 +1328,7 @@ function loadBhutaKala() {
     createTorchLight(x + 8, 1, z + 8, true);  // Light ON (Depan Kanan)
     createTorchLight(x - 8, 1, z - 8, true);  // Light ON (Belakang Kiri)
 
-    loader.load('ogoh.glb', (gltf) => {
+    loader.load('/ogoh.glb', (gltf) => {
         const model = gltf.scene;
         model.position.set(x, yPos, z);
         model.scale.set(5, 5, 5);
@@ -1383,7 +1383,7 @@ function loadKuwera() {
     createTorchLight(x + 5, 1, z + 5, true);  // Light ON
     createTorchLight(x - 5, 1, z - 5, true);  // Light ON
 
-    loader.load('kuwera_punia.glb', (gltf) => {
+    loader.load('/kuwera_punia.glb', (gltf) => {
         const model = gltf.scene;
         model.position.set(x, yPos, z);
         model.scale.set(3, 3, 3); // Diperbesar dari 0.03 ke 5
@@ -1445,7 +1445,7 @@ function loadReog() {
     createTorchLight(x + 5, 1, z + 5, true);  // Light ON
     createTorchLight(x - 5, 1, z - 5, true);  // Light ON
 
-    loader.load('reog.glb', (gltf) => {
+    loader.load('/reog.glb', (gltf) => {
         const model = gltf.scene;
         model.position.set(x, yPos, z);
         model.scale.set(10, 10, 10); // Diperbesar dari 3 ke 10
@@ -1499,7 +1499,7 @@ function loadRangda() {
     createTorchLight(x + 5, 1, z + 5, true);  // Light ON
     createTorchLight(x - 5, 1, z - 5, true);  // Light ON
 
-    loader.load('patung-rangda.glb', (gltf) => {
+    loader.load('/patung-rangda.glb', (gltf) => {
         const model = gltf.scene;
         model.position.set(x, yPos, z);
         model.scale.set(6, 6, 6); // Diperbesar dari 3 ke 10
