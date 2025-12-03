@@ -4,6 +4,7 @@ import { PointerLockControls } from "three/addons/controls/PointerLockControls.j
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 // =========================
 // SETUP DASAR SCENE
@@ -78,7 +79,7 @@ document.body.appendChild(renderer.domElement);
 const renderScene = new RenderPass(scene, camera);
 
 const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), // Optimized Resolution
   1.5, // strength
   0.4, // radius
   0.85 // threshold
@@ -110,8 +111,8 @@ scene.add(hemiLight);
 const moonLight = new THREE.DirectionalLight(0xaaccff, 2.5); // Intensity tinggi untuk tone mapping
 moonLight.position.set(50, 100, 50);
 moonLight.castShadow = true;
-moonLight.shadow.mapSize.width = 4096; // High res shadow
-moonLight.shadow.mapSize.height = 4096;
+moonLight.shadow.mapSize.width = 2048; // Optimized Shadow Map
+moonLight.shadow.mapSize.height = 2048;
 moonLight.shadow.camera.near = 0.5;
 moonLight.shadow.camera.far = 500;
 moonLight.shadow.camera.left = -100;
@@ -190,7 +191,7 @@ function createTorchLight(x, y, z) {
 
   // 4. Spark System (Percikan Api Sederhana)
   // Kita buat beberapa partikel kecil yang akan bergerak ke atas
-  for(let i=0; i<5; i++) {
+  for(let i=0; i<3; i++) { // Reduced count
       const sparkGeom = new THREE.PlaneGeometry(0.05, 0.05);
       const sparkMat = new THREE.MeshBasicMaterial({ 
           color: 0xffaa00, 
@@ -199,6 +200,8 @@ function createTorchLight(x, y, z) {
           opacity: 1
       });
       const spark = new THREE.Mesh(sparkGeom, sparkMat);
+      spark.castShadow = false; // Disable shadow for particles
+      spark.receiveShadow = false;
       
       // Random start position near flame
       resetSpark(spark, x, y, z);
@@ -229,13 +232,13 @@ const textureLoader = new THREE.TextureLoader();
 
 // Procedural Grid Texture untuk tanah (Seamless & Natural)
 const canvas = document.createElement('canvas');
-canvas.width = 2048; // Increased resolution
-canvas.height = 2048;
+canvas.width = 1024; // Optimized Resolution
+canvas.height = 1024;
 const context = canvas.getContext('2d');
 
 // 1. Base Layer (Dark Soil)
 context.fillStyle = '#1a1510'; 
-context.fillRect(0, 0, 2048, 2048);
+context.fillRect(0, 0, 1024, 1024);
 
 // Helper for seamless drawing
 function drawSeamlessSpot(x, y, radius, color) {
@@ -679,35 +682,35 @@ const sharedLeavesMat = new THREE.MeshStandardMaterial({
     alphaTest: 0.3 // Cutout for sharper edges if we had alpha, but keeps it solid here
 });
 
-// Pohon Beringin (Banyan Tree) - Realistic Procedural
+// Pohon Beringin (Banyan Tree) - Realistic Procedural (OPTIMIZED)
 function createTree(x, z) {
   const treeGroup = new THREE.Group();
   treeGroup.position.set(x, 0, z);
 
   // Randomize size
-  const scale = 1.5 + Math.random() * 1.0; // Lebih besar dan megah
+  const scale = 1.5 + Math.random() * 1.0; 
   treeGroup.scale.set(scale, scale, scale);
+
+  const trunkGeometries = [];
+  const leafGeometries = [];
 
   // 1. Main Trunk (Fused Roots System)
   const trunkHeight = 3.5 + Math.random();
   const trunkRadius = 0.6 + Math.random() * 0.4;
   
-  // Central core (invisible or inner support)
+  // Central core
   const coreGeom = new THREE.CylinderGeometry(trunkRadius * 0.8, trunkRadius, trunkHeight, 8);
-  const core = new THREE.Mesh(coreGeom, sharedTrunkMat);
-  core.position.y = trunkHeight / 2;
-  core.castShadow = true;
-  core.receiveShadow = true;
-  treeGroup.add(core);
+  coreGeom.translate(0, trunkHeight / 2, 0);
+  trunkGeometries.push(coreGeom);
 
-  // Surrounding roots (Strangler effect - Batang berotot)
+  // Surrounding roots
   const rootCount = 5 + Math.floor(Math.random() * 4);
   for(let i=0; i<rootCount; i++) {
       const r = 0.15 + Math.random() * 0.2;
       const h = trunkHeight * (0.9 + Math.random() * 0.2);
       const rootGeom = new THREE.CylinderGeometry(r, r + 0.15, h, 5);
       
-      // Wiggle the root vertices for organic look
+      // Wiggle
       const posAttribute = rootGeom.attributes.position;
       for(let v=0; v<posAttribute.count; v++){
           const y = posAttribute.getY(v);
@@ -718,130 +721,148 @@ function createTree(x, z) {
       }
       rootGeom.computeVertexNormals();
 
-      const root = new THREE.Mesh(rootGeom, sharedTrunkMat);
-      
       const angle = (i / rootCount) * Math.PI * 2 + Math.random() * 0.5;
       const dist = trunkRadius * (0.7 + Math.random() * 0.3);
       
-      root.position.set(Math.cos(angle) * dist, h/2, Math.sin(angle) * dist);
-      
-      // Random tilt
-      root.rotation.set(
+      const rootMatrix = new THREE.Matrix4();
+      const rotation = new THREE.Euler(
           (Math.random()-0.5)*0.15, 
           Math.random()*Math.PI, 
           (Math.random()-0.5)*0.15
       );
-
-      root.castShadow = true;
-      treeGroup.add(root);
+      const position = new THREE.Vector3(
+          Math.cos(angle) * dist, 
+          h/2, 
+          Math.sin(angle) * dist
+      );
+      
+      const quaternion = new THREE.Quaternion().setFromEuler(rotation);
+      rootMatrix.compose(position, quaternion, new THREE.Vector3(1,1,1));
+      rootGeom.applyMatrix4(rootMatrix);
+      
+      trunkGeometries.push(rootGeom);
   }
 
-  // 2. Branches (Spreading wide)
+  // 2. Branches
   const branchCount = 5 + Math.floor(Math.random() * 3);
-  const branchGroup = new THREE.Group();
-  branchGroup.position.y = trunkHeight * 0.85;
-  treeGroup.add(branchGroup);
+  const branchGroupY = trunkHeight * 0.85;
 
   for(let i=0; i<branchCount; i++) {
       const angle = (i / branchCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
       const length = 4 + Math.random() * 3;
       const thickness = 0.35;
       
-      // Branch Geometry
       const branchGeom = new THREE.CylinderGeometry(0.08, thickness, length, 5);
       branchGeom.translate(0, length/2, 0);
-      branchGeom.rotateX(Math.PI / 2); // Point along Z
+      branchGeom.rotateX(Math.PI / 2); 
       
-      const branch = new THREE.Mesh(branchGeom, sharedTrunkMat);
-      branch.rotation.y = angle;
-      const liftAngle = -0.1 - Math.random() * 0.3; // Lift up slightly
-      branch.rotation.x = liftAngle; 
+      const liftAngle = -0.1 - Math.random() * 0.3;
       
-      branch.castShadow = true;
-      branchGroup.add(branch);
+      const branchMatrix = new THREE.Matrix4();
+      const branchRot = new THREE.Euler(liftAngle, angle, 0); 
+      const branchPos = new THREE.Vector3(0, branchGroupY, 0);
+      
+      const branchQuat = new THREE.Quaternion().setFromEuler(branchRot);
+      branchMatrix.compose(branchPos, branchQuat, new THREE.Vector3(1,1,1));
+      
+      // Apply to geometry copy for trunk
+      const branchGeomForTrunk = branchGeom.clone();
+      branchGeomForTrunk.applyMatrix4(branchMatrix);
+      trunkGeometries.push(branchGeomForTrunk);
 
-      // 3. Leaf Clusters (Foliage)
-      // Add multiple clumps along the branch
+      // 3. Leaf Clusters
       const clumps = 4 + Math.floor(Math.random() * 3);
       for(let j=0; j<clumps; j++) {
-          const t = 0.3 + (j/clumps) * 0.7; // Distribute along outer part
+          const t = 0.3 + (j/clumps) * 0.7;
           const clumpSize = 1.0 + Math.random() * 0.8;
           
-          // Use Dodecahedron for leafy look
           const leafGeom = new THREE.DodecahedronGeometry(clumpSize, 0);
-          const leaf = new THREE.Mesh(leafGeom, sharedLeavesMat);
           
-          // Position relative to branch (Local Z is length)
-          leaf.position.set(
+          // Local pos relative to branch
+          const localPos = new THREE.Vector3(
               (Math.random()-0.5)*1.5, 
-              (Math.random()-0.5)*1.0 + 0.5, // Slightly above branch
+              (Math.random()-0.5)*1.0 + 0.5, 
               length * t
           );
           
-          // Random rotation
-          leaf.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+          // Apply Branch Transform
+          localPos.applyMatrix4(branchMatrix);
           
-          leaf.castShadow = true;
-          leaf.receiveShadow = true;
-          branch.add(leaf);
+          leafGeom.rotateX(Math.random()*Math.PI);
+          leafGeom.rotateY(Math.random()*Math.PI);
+          leafGeom.rotateZ(Math.random()*Math.PI);
+          
+          leafGeom.translate(localPos.x, localPos.y, localPos.z);
+          
+          leafGeometries.push(leafGeom);
       }
       
-      // 4. Aerial Roots (Hanging from branches to ground)
-      // SMART CHECK: Only spawn if not blocking path
+      // 4. Aerial Roots
       const rootDrops = 1 + Math.floor(Math.random() * 3);
       for(let r=0; r<rootDrops; r++) {
           const t = 0.4 + Math.random() * 0.5;
           const dist = length * t;
           
-          // Calculate world position of the drop point
-          // Horizontal distance from center
           const hDist = dist * Math.cos(liftAngle);
-          
           const rX_local = Math.sin(angle) * hDist;
           const rZ_local = Math.cos(angle) * hDist;
           
-          // World Pos
           const worldX = x + rX_local * scale;
           const worldZ = z + rZ_local * scale;
           
-          // PATH COLLISION CHECK
           const onMainCross = Math.abs(worldX) < 5 || Math.abs(worldZ) < 5;
           const onPathZ40 = Math.abs(worldZ - 40) < 5;
           const onPathXMin40 = Math.abs(worldX + 40) < 5;
           
-          if (onMainCross || onPathZ40 || onPathXMin40) {
-              continue; // SKIP this root if it lands on path
-          }
+          if (onMainCross || onPathZ40 || onPathXMin40) continue;
 
-          // Height at that point
           const rY = (trunkHeight * 0.85) + (dist * Math.sin(-liftAngle)); 
+          const rootH = rY;
           
-          // Create root
-          const rootH = rY; // Reach ground
           if (rootH > 0.5) {
               const aGeom = new THREE.CylinderGeometry(0.03, 0.05, rootH, 3);
-              aGeom.translate(0, rootH/2, 0); // Pivot at bottom (ground)
-              const aRoot = new THREE.Mesh(aGeom, sharedTrunkMat);
+              aGeom.translate(0, rootH/2, 0);
               
-              // Add some randomness to position
-              aRoot.position.set(
-                  rX_local + (Math.random()-0.5)*0.5, 
-                  0, 
-                  rZ_local + (Math.random()-0.5)*0.5
-              );
+              const aX = rX_local + (Math.random()-0.5)*0.5;
+              const aZ = rZ_local + (Math.random()-0.5)*0.5;
               
-              aRoot.castShadow = true;
-              treeGroup.add(aRoot);
+              aGeom.translate(aX, 0, aZ);
+              trunkGeometries.push(aGeom);
           }
       }
   }
   
-  // Top Canopy (Cover the center hole)
+  // Top Canopy
   const topGeom = new THREE.DodecahedronGeometry(2.5, 0);
-  const top = new THREE.Mesh(topGeom, sharedLeavesMat);
-  top.position.y = trunkHeight + 1;
-  top.castShadow = true;
-  treeGroup.add(top);
+  topGeom.translate(0, trunkHeight + 1, 0);
+  leafGeometries.push(topGeom);
+
+  // MERGE WITH VALIDATION
+  if (trunkGeometries.length > 0) {
+      const validTrunks = trunkGeometries.filter(g => g && g.getAttribute('position'));
+      if (validTrunks.length > 0) {
+          const mergedTrunk = BufferGeometryUtils.mergeGeometries(validTrunks);
+          if (mergedTrunk) {
+              const trunkMesh = new THREE.Mesh(mergedTrunk, sharedTrunkMat);
+              trunkMesh.castShadow = true;
+              trunkMesh.receiveShadow = true;
+              treeGroup.add(trunkMesh);
+          }
+      }
+  }
+  
+  if (leafGeometries.length > 0) {
+      const validLeaves = leafGeometries.filter(g => g && g.getAttribute('position'));
+      if (validLeaves.length > 0) {
+          const mergedLeaves = BufferGeometryUtils.mergeGeometries(validLeaves);
+          if (mergedLeaves) {
+              const leavesMesh = new THREE.Mesh(mergedLeaves, sharedLeavesMat);
+              leavesMesh.castShadow = true;
+              leavesMesh.receiveShadow = true;
+              treeGroup.add(leavesMesh);
+          }
+      }
+  }
 
   scene.add(treeGroup);
 }
@@ -884,50 +905,56 @@ for(let i=0; i<5000; i++) {
 }
 const rockTexture = new THREE.CanvasTexture(rockCanvas);
 
-function createRock(x, z, scale = 1) {
-  // Ganti ke IcosahedronGeometry dengan detail 0 untuk bentuk batu yang lebih tajam/natural
-  // Hapus deformasi vertex manual yang menyebabkan mesh berlubang (tembus pandang)
-  const rockGeom = new THREE.IcosahedronGeometry(scale, 0); 
-
-  const rockMat = new THREE.MeshStandardMaterial({
+const rockMat = new THREE.MeshStandardMaterial({
     map: rockTexture,
-    roughness: 1.0, // Batu sangat kasar
+    roughness: 1.0, 
     bumpMap: rockTexture,
-    bumpScale: 0.2, // Tekstur lebih dalam
+    bumpScale: 0.2, 
     color: 0x777777
-  });
-  
-  const rock = new THREE.Mesh(rockGeom, rockMat);
-  
-  // Gunakan Non-Uniform Scaling untuk variasi bentuk
-  rock.scale.set(
-      1 + (Math.random() * 0.5), // Agak lonjong
-      0.6 + (Math.random() * 0.4), // Agak gepeng
-      1 + (Math.random() * 0.5)
-  );
-  
-  rock.position.set(x, scale * 0.3, z); // Tertanam di tanah
-  rock.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
-  
-  rock.castShadow = true;
-  rock.receiveShadow = true;
-  scene.add(rock);
-}
+});
 
-for (let i = 0; i < 30; i++) { // Tambah jumlah batu
+const rockGeometries = [];
+
+for (let i = 0; i < 30; i++) { 
   const x = (Math.random() - 0.5) * 120;
   const z = (Math.random() - 0.5) * 120;
   
-  // Hindari area tengah (jalan)
-  // Check main cross
   const onMainCross = Math.abs(x) < 6 || Math.abs(z) < 6;
-  // Check additional paths
   const onPathZ40 = Math.abs(z - 40) < 6;
   const onPathXMin40 = Math.abs(x + 40) < 6;
   
   if (!onMainCross && !onPathZ40 && !onPathXMin40) {
-    createRock(x, z, 0.5 + Math.random() * 1.0);
+      const scale = 0.5 + Math.random() * 1.0;
+      const rockGeom = new THREE.IcosahedronGeometry(scale, 0);
+      
+      // Non-Uniform Scaling
+      rockGeom.scale(
+          1 + (Math.random() * 0.5), 
+          0.6 + (Math.random() * 0.4), 
+          1 + (Math.random() * 0.5)
+      );
+      
+      rockGeom.rotateX(Math.random()*Math.PI);
+      rockGeom.rotateY(Math.random()*Math.PI);
+      rockGeom.rotateZ(Math.random()*Math.PI);
+      
+      rockGeom.translate(x, scale * 0.3, z);
+      
+      rockGeometries.push(rockGeom);
   }
+}
+
+if (rockGeometries.length > 0) {
+    const validRocks = rockGeometries.filter(g => g && g.getAttribute('position'));
+    if (validRocks.length > 0) {
+        const mergedRocks = BufferGeometryUtils.mergeGeometries(validRocks);
+        if (mergedRocks) {
+            const rocksMesh = new THREE.Mesh(mergedRocks, rockMat);
+            rocksMesh.castShadow = true;
+            rocksMesh.receiveShadow = true;
+            scene.add(rocksMesh);
+        }
+    }
 }
 
 // =========================
@@ -979,48 +1006,37 @@ function createTempleRuins(x, z) {
     const group = new THREE.Group();
     
     // 1. Hitung ketinggian tanah di posisi ini agar tidak melayang
-    // Rumus terrain dari groundGeom:
-    // height = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 0.5 + noise...
-    // Kita ambil estimasi kasar atau tanamkan sedikit
     const terrainHeightEstimate = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 0.5;
     
     group.position.set(x, terrainHeightEstimate - 0.2, z); // Tanamkan 0.2 unit ke bawah
     
     const type = Math.floor(Math.random() * 3); // 0: Pillar, 1: Wall, 2: Rubble
+    const geometries = [];
     
     if (type === 0) { // Broken Pillar
         // Base (Pondasi)
-        const baseGeom = new THREE.BoxGeometry(1.2, 0.5, 1.2); // Sedikit lebih tinggi untuk kompensasi tanam
-        const base = new THREE.Mesh(baseGeom, ruinMat);
-        base.position.y = 0.25;
-        base.castShadow = true;
-        base.receiveShadow = true;
-        group.add(base);
+        const baseGeom = new THREE.BoxGeometry(1.2, 0.5, 1.2); 
+        baseGeom.translate(0, 0.25, 0);
+        geometries.push(baseGeom);
         
         // Pillar
         const height = 1.0 + Math.random() * 2.0;
         const pillarGeom = new THREE.CylinderGeometry(0.4, 0.4, height, 16);
-        const pillar = new THREE.Mesh(pillarGeom, ruinMat);
-        pillar.position.y = 0.5 + height / 2; // Tepat di atas base (0.5)
         
         // Tilt slightly if it's short (broken)
         if (Math.random() > 0.5) {
-            pillar.rotation.z = (Math.random() - 0.5) * 0.2;
-            pillar.rotation.x = (Math.random() - 0.5) * 0.2;
+            pillarGeom.rotateZ((Math.random() - 0.5) * 0.2);
+            pillarGeom.rotateX((Math.random() - 0.5) * 0.2);
         }
         
-        pillar.castShadow = true;
-        pillar.receiveShadow = true;
-        group.add(pillar);
+        pillarGeom.translate(0, 0.5 + height / 2, 0);
+        geometries.push(pillarGeom);
         
         // Top debris (if broken)
         if (Math.random() > 0.3) {
              const debrisGeom = new THREE.DodecahedronGeometry(0.3, 0);
-             const debris = new THREE.Mesh(debrisGeom, ruinMat);
-             debris.position.set(0.5, 0.2, 0.5); // Di tanah
-             debris.castShadow = true;
-             debris.receiveShadow = true;
-             group.add(debris);
+             debrisGeom.translate(0.5, 0.2, 0.5);
+             geometries.push(debrisGeom);
         }
         
     } else if (type === 1) { // Collapsed Wall (FIXED STACKING)
@@ -1032,43 +1048,40 @@ function createTempleRuins(x, z) {
             const h = 0.4 + Math.random() * 0.3; // Variasi tinggi
             const d = 0.4 + Math.random() * 0.2;
             
-            const block = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), ruinMat);
+            const blockGeom = new THREE.BoxGeometry(w, h, d);
             
             // Posisi Y adalah currentY + setengah tinggi blok ini
             // Dikurangi sedikit (0.05) untuk overlap agar terlihat menyatu/berat
             const yPos = currentY + (h / 2) - (i > 0 ? 0.05 : 0); 
+            currentY += h - (i > 0 ? 0.05 : 0);
             
-            block.position.set(
+            // Rotasi acak sedikit agar terlihat tua/miring
+            blockGeom.rotateY((Math.random() - 0.5) * 0.2);
+            blockGeom.rotateZ((Math.random() - 0.5) * 0.1); // Miring kiri/kanan
+            
+            blockGeom.translate(
                 (Math.random() - 0.5) * 0.3, // Sedikit geser horizontal (tidak rata)
                 yPos, 
                 (Math.random() - 0.5) * 0.1
             );
             
-            // Update currentY untuk blok berikutnya (tinggi penuh dikurangi overlap)
-            currentY += h - (i > 0 ? 0.05 : 0);
-            
-            // Rotasi acak sedikit agar terlihat tua/miring
-            block.rotation.y = (Math.random() - 0.5) * 0.2;
-            block.rotation.z = (Math.random() - 0.5) * 0.1; // Miring kiri/kanan
-            
-            block.castShadow = true;
-            block.receiveShadow = true;
-            group.add(block);
+            geometries.push(blockGeom);
         }
         
         // Fallen blocks di sekitar tembok
         const fallenCount = 2;
         for(let i=0; i<fallenCount; i++) {
-             const block = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.3), ruinMat);
-             block.position.set(
+             const blockGeom = new THREE.BoxGeometry(0.5, 0.3, 0.3);
+             blockGeom.rotateX(Math.random());
+             blockGeom.rotateY(Math.random());
+             blockGeom.rotateZ(Math.random());
+             
+             blockGeom.translate(
                  0.8 + Math.random() * 0.5,
                  0.15, // Di tanah
                  (Math.random() - 0.5) * 1.0
              );
-             block.rotation.set(Math.random(), Math.random(), Math.random());
-             block.castShadow = true;
-             block.receiveShadow = true;
-             group.add(block);
+             geometries.push(blockGeom);
         }
 
     } else { // Rubble Pile (FIXED FLOATING)
@@ -1079,7 +1092,6 @@ function createTempleRuins(x, z) {
                 new THREE.DodecahedronGeometry(size, 0) : 
                 new THREE.BoxGeometry(size, size, size);
             
-            const mesh = new THREE.Mesh(geom, ruinMat);
             const angle = Math.random() * Math.PI * 2;
             const dist = Math.random() * 1.2;
             
@@ -1087,16 +1099,30 @@ function createTempleRuins(x, z) {
             // Base height random kecil
             const yBase = size * 0.4; 
             
-            mesh.position.set(
+            geom.rotateX(Math.random()*Math.PI);
+            geom.rotateY(Math.random()*Math.PI);
+            geom.rotateZ(Math.random()*Math.PI);
+            
+            geom.translate(
                 Math.cos(angle) * dist,
                 yBase,
                 Math.sin(angle) * dist
             );
             
-            mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            group.add(mesh);
+            geometries.push(geom);
+        }
+    }
+    
+    if (geometries.length > 0) {
+        const validGeoms = geometries.filter(g => g && g.getAttribute('position'));
+        if (validGeoms.length > 0) {
+            const mergedGeom = BufferGeometryUtils.mergeGeometries(validGeoms);
+            if (mergedGeom) {
+                const mesh = new THREE.Mesh(mergedGeom, ruinMat);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                group.add(mesh);
+            }
         }
     }
     
@@ -1824,6 +1850,7 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
+  bloomPass.resolution.set(window.innerWidth / 2, window.innerHeight / 2); // Update bloom resolution
 });
 
 // =========================
@@ -1920,11 +1947,15 @@ function animate() {
       ", " +
       camera.position.z.toFixed(0);
 
-    // Check proximity to Ogoh-ogoh
-    checkProximity();
+    // Check proximity to Ogoh-ogoh (Throttled)
+    if (renderer.info.render.frame % 10 === 0) {
+        checkProximity();
+    }
 
-    // Update minimap
-    updateMinimap();
+    // Update minimap (Throttled for performance)
+    if (renderer.info.render.frame % 3 === 0) {
+        updateMinimap();
+    }
   } else {
     hud.style.display = "none";
     crosshair.style.display = "none";
