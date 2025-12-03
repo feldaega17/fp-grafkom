@@ -50,6 +50,7 @@ function createStarfield() {
     });
 
     const starField = new THREE.Points(starsGeometry, starsMaterial);
+    starField.name = "starField"; // Name for toggling
     scene.add(starField);
 }
 createStarfield();
@@ -704,6 +705,13 @@ document.addEventListener("keydown", (e) => {
         playerState.canJump = false;
       }
       break;
+    case "Digit1": // Toggle Music
+      toggleMusic();
+      break;
+    case "Digit2": // Toggle Day/Night
+      isNight = !isNight;
+      toggleDayNight();
+      break;
   }
 });
 
@@ -739,7 +747,7 @@ blocker.style.cssText =
   "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; font-family: Segoe UI, sans-serif; color: white;";
 
 blocker.innerHTML =
-  '<h1 style="font-size: 48px; margin-bottom: 10px; color: #ff6b35;">OGOH-OGOH WORLD</h1><p style="font-size: 18px; color: #aaa; margin-bottom: 30px;">Jelajahi dunia Ogoh-ogoh saat malam Nyepi</p><button id="playBtn" style="padding: 15px 40px; font-size: 20px; background: linear-gradient(45deg, #ff6b35, #f7931e); border: none; border-radius: 10px; color: white; cursor: pointer; font-weight: bold;">MULAI JELAJAH</button><div style="margin-top: 40px; text-align: center; color: #888;"><p>WASD atau Arrow Keys - Bergerak</p><p>Mouse - Melihat sekeliling</p><p>Space - Lompat</p><p>Dekati Ogoh-ogoh untuk melihat info</p></div>';
+  '<h1 style="font-size: 48px; margin-bottom: 10px; color: #ff6b35;">OGOH-OGOH WORLD</h1><p id="modeText" style="font-size: 18px; color: #aaa; margin-bottom: 30px;">Jelajahi dunia Ogoh-ogoh saat malam Nyepi</p><button id="playBtn" style="padding: 15px 40px; font-size: 20px; background: linear-gradient(45deg, #ff6b35, #f7931e); border: none; border-radius: 10px; color: white; cursor: pointer; font-weight: bold;">MULAI JELAJAH</button><div style="margin-top: 40px; text-align: center; color: #888;"><p>WASD atau Arrow Keys - Bergerak</p><p>Mouse - Melihat sekeliling</p><p>Space - Lompat</p><p>Dekati Ogoh-ogoh untuk melihat info</p></div>';
 document.body.appendChild(blocker);
 
 document.getElementById("playBtn").addEventListener("click", () => {
@@ -826,19 +834,93 @@ audioLoader.load("/reog-music.mp3", (buffer) => {
 
 // Music toggle button
 const musicBtn = document.createElement("button");
-musicBtn.innerText = "Musik OFF";
+musicBtn.innerText = "[1] Musik: OFF";
 musicBtn.style.cssText =
   "position: fixed; top: 20px; right: 20px; padding: 10px 15px; background: rgba(0, 0, 0, 0.7); color: white; border: 2px solid #ff6b35; border-radius: 8px; cursor: pointer; font-size: 14px; z-index: 100; display: none;";
-musicBtn.onclick = () => {
+
+function toggleMusic() {
   if (bgMusic.isPlaying) {
     bgMusic.pause();
-    musicBtn.innerText = "Musik OFF";
+    musicBtn.innerText = "[1] Musik: OFF";
   } else {
     bgMusic.play();
-    musicBtn.innerText = "Musik ON";
+    musicBtn.innerText = "[1] Musik: ON";
   }
-};
+}
+
+musicBtn.onclick = toggleMusic;
 document.body.appendChild(musicBtn);
+
+// Day/Night Toggle
+let isNight = true;
+const dayNightBtn = document.createElement("button");
+dayNightBtn.innerText = "[2] Mode: Malam";
+dayNightBtn.style.cssText =
+  "position: fixed; top: 70px; right: 20px; padding: 10px 15px; background: rgba(0, 0, 0, 0.7); color: white; border: 2px solid #ff6b35; border-radius: 8px; cursor: pointer; font-size: 14px; z-index: 100; display: none;";
+
+dayNightBtn.onclick = () => {
+  isNight = !isNight;
+  toggleDayNight();
+};
+document.body.appendChild(dayNightBtn);
+
+function toggleDayNight() {
+    const starField = scene.getObjectByName("starField");
+    const modeText = document.getElementById("modeText");
+
+    if (isNight) {
+        // Switch to Night
+        dayNightBtn.innerText = "[2] Mode: Malam";
+        scene.background = new THREE.Color(0x050510);
+        scene.fog.color.setHex(0x050510);
+        scene.fog.density = 0.002;
+        
+        // Moon settings
+        moonLight.color.setHex(0xaaccff);
+        moonLight.intensity = 2.5;
+        moonLight.position.set(50, 100, 50);
+        
+        // Stars visible
+        if(starField) starField.visible = true;
+        
+        // Torches visible
+        torchLights.forEach(l => l.visible = true);
+        flameObjects.forEach(f => f.group.visible = true);
+        
+        // Bloom strong
+        bloomPass.strength = 0.8;
+        bloomPass.threshold = 0.2;
+
+        // Text
+        if(modeText) modeText.innerText = "Jelajahi dunia Ogoh-ogoh saat malam Nyepi";
+        
+    } else {
+        // Switch to Day
+        dayNightBtn.innerText = "[2] Mode: Siang";
+        scene.background = new THREE.Color(0x87CEEB); // Sky Blue
+        scene.fog.color.setHex(0x87CEEB);
+        scene.fog.density = 0.001; // Less fog in day
+        
+        // Sun settings
+        moonLight.color.setHex(0xffffee); // Warm Sun
+        moonLight.intensity = 5.0;
+        moonLight.position.set(-50, 200, -50); // Different angle
+        
+        // Stars invisible
+        if(starField) starField.visible = false;
+        
+        // Torches invisible (or just light off)
+        torchLights.forEach(l => l.visible = false);
+        flameObjects.forEach(f => f.group.visible = false);
+        
+        // Bloom weak
+        bloomPass.strength = 0.2;
+        bloomPass.threshold = 0.8;
+
+        // Text
+        if(modeText) modeText.innerText = "Jelajahi dunia Ogoh-ogoh saat hari Nyepi";
+    }
+}
 
 // =========================
 // PROXIMITY INTERACTION
@@ -959,6 +1041,7 @@ function animate() {
     crosshair.style.display = "block";
     minimap.style.display = "block";
     musicBtn.style.display = "block";
+    dayNightBtn.style.display = "block";
 
     // --- PHYSICS MOVEMENT ---
     
@@ -1039,6 +1122,7 @@ function animate() {
     crosshair.style.display = "none";
     minimap.style.display = "none";
     musicBtn.style.display = "none";
+    dayNightBtn.style.display = "none";
   }
 
   // Animate fire particles
