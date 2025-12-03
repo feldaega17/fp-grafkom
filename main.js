@@ -775,15 +775,22 @@ const ruinMat = new THREE.MeshStandardMaterial({
 
 function createTempleRuins(x, z) {
     const group = new THREE.Group();
-    group.position.set(x, 0, z);
+    
+    // 1. Hitung ketinggian tanah di posisi ini agar tidak melayang
+    // Rumus terrain dari groundGeom:
+    // height = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 0.5 + noise...
+    // Kita ambil estimasi kasar atau tanamkan sedikit
+    const terrainHeightEstimate = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 0.5;
+    
+    group.position.set(x, terrainHeightEstimate - 0.2, z); // Tanamkan 0.2 unit ke bawah
     
     const type = Math.floor(Math.random() * 3); // 0: Pillar, 1: Wall, 2: Rubble
     
     if (type === 0) { // Broken Pillar
-        // Base
-        const baseGeom = new THREE.BoxGeometry(1.2, 0.4, 1.2);
+        // Base (Pondasi)
+        const baseGeom = new THREE.BoxGeometry(1.2, 0.5, 1.2); // Sedikit lebih tinggi untuk kompensasi tanam
         const base = new THREE.Mesh(baseGeom, ruinMat);
-        base.position.y = 0.2;
+        base.position.y = 0.25;
         base.castShadow = true;
         base.receiveShadow = true;
         group.add(base);
@@ -792,7 +799,7 @@ function createTempleRuins(x, z) {
         const height = 1.0 + Math.random() * 2.0;
         const pillarGeom = new THREE.CylinderGeometry(0.4, 0.4, height, 16);
         const pillar = new THREE.Mesh(pillarGeom, ruinMat);
-        pillar.position.y = 0.4 + height / 2;
+        pillar.position.y = 0.5 + height / 2; // Tepat di atas base (0.5)
         
         // Tilt slightly if it's short (broken)
         if (Math.random() > 0.5) {
@@ -808,43 +815,52 @@ function createTempleRuins(x, z) {
         if (Math.random() > 0.3) {
              const debrisGeom = new THREE.DodecahedronGeometry(0.3, 0);
              const debris = new THREE.Mesh(debrisGeom, ruinMat);
-             debris.position.set(0.5, 0.2, 0.5);
+             debris.position.set(0.5, 0.2, 0.5); // Di tanah
              debris.castShadow = true;
              debris.receiveShadow = true;
              group.add(debris);
         }
         
-    } else if (type === 1) { // Collapsed Wall
+    } else if (type === 1) { // Collapsed Wall (FIXED STACKING)
         const blockCount = 3 + Math.floor(Math.random() * 4);
+        let currentY = 0; // Pelacak ketinggian tumpukan
+
         for(let i=0; i<blockCount; i++) {
             const w = 0.8 + Math.random() * 0.4;
-            const h = 0.4 + Math.random() * 0.2;
+            const h = 0.4 + Math.random() * 0.3; // Variasi tinggi
             const d = 0.4 + Math.random() * 0.2;
+            
             const block = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), ruinMat);
             
-            // Stack roughly
+            // Posisi Y adalah currentY + setengah tinggi blok ini
+            // Dikurangi sedikit (0.05) untuk overlap agar terlihat menyatu/berat
+            const yPos = currentY + (h / 2) - (i > 0 ? 0.05 : 0); 
+            
             block.position.set(
-                (Math.random() - 0.5) * 0.5,
-                h/2 + i * (h - 0.05), // Overlap slightly
-                (Math.random() - 0.5) * 0.2
+                (Math.random() - 0.5) * 0.3, // Sedikit geser horizontal (tidak rata)
+                yPos, 
+                (Math.random() - 0.5) * 0.1
             );
             
-            // Rotate randomly
-            block.rotation.y = (Math.random() - 0.5) * 0.5;
-            block.rotation.z = (Math.random() - 0.5) * 0.1;
+            // Update currentY untuk blok berikutnya (tinggi penuh dikurangi overlap)
+            currentY += h - (i > 0 ? 0.05 : 0);
+            
+            // Rotasi acak sedikit agar terlihat tua/miring
+            block.rotation.y = (Math.random() - 0.5) * 0.2;
+            block.rotation.z = (Math.random() - 0.5) * 0.1; // Miring kiri/kanan
             
             block.castShadow = true;
             block.receiveShadow = true;
             group.add(block);
         }
         
-        // Fallen blocks
+        // Fallen blocks di sekitar tembok
         const fallenCount = 2;
         for(let i=0; i<fallenCount; i++) {
-             const block = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.4), ruinMat);
+             const block = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.3), ruinMat);
              block.position.set(
-                 1.0 + Math.random(),
-                 0.2,
+                 0.8 + Math.random() * 0.5,
+                 0.15, // Di tanah
                  (Math.random() - 0.5) * 1.0
              );
              block.rotation.set(Math.random(), Math.random(), Math.random());
@@ -853,8 +869,8 @@ function createTempleRuins(x, z) {
              group.add(block);
         }
 
-    } else { // Rubble Pile
-        const count = 5 + Math.floor(Math.random() * 5);
+    } else { // Rubble Pile (FIXED FLOATING)
+        const count = 6 + Math.floor(Math.random() * 6);
         for(let i=0; i<count; i++) {
             const size = 0.2 + Math.random() * 0.4;
             const geom = Math.random() > 0.5 ? 
@@ -863,11 +879,15 @@ function createTempleRuins(x, z) {
             
             const mesh = new THREE.Mesh(geom, ruinMat);
             const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * 1.5;
+            const dist = Math.random() * 1.2;
+            
+            // Pastikan menyentuh tanah atau tertumpuk
+            // Base height random kecil
+            const yBase = size * 0.4; 
             
             mesh.position.set(
                 Math.cos(angle) * dist,
-                size/2,
+                yBase,
                 Math.sin(angle) * dist
             );
             
@@ -883,8 +903,8 @@ function createTempleRuins(x, z) {
     scene.add(group);
 }
 
-// Spawn Ruins
-for (let i = 0; i < 25; i++) {
+// Spawn Ruins Randomly
+for (let i = 0; i < 20; i++) {
   const x = (Math.random() - 0.5) * 140;
   const z = (Math.random() - 0.5) * 140;
   
@@ -897,6 +917,31 @@ for (let i = 0; i < 25; i++) {
     createTempleRuins(x, z);
   }
 }
+
+// Spawn Ruins Around Models (Contextual Placement)
+function spawnRuinsAround(centerX, centerZ, count, radius) {
+    for(let i=0; i<count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        // Distance: min 8 (outside path), max radius
+        const dist = 8 + Math.random() * (radius - 8); 
+        const x = centerX + Math.cos(angle) * dist;
+        const z = centerZ + Math.sin(angle) * dist;
+        
+        // Safety check for paths
+        const onMainCross = Math.abs(x) < 5 || Math.abs(z) < 5;
+        const onPathZ40 = Math.abs(z - 40) < 5;
+        const onPathXMin40 = Math.abs(x + 40) < 5;
+
+        if (!onMainCross && !onPathZ40 && !onPathXMin40) {
+             createTempleRuins(x, z);
+        }
+    }
+}
+
+// Add ruins near specific statues to create "ancient site" feel
+spawnRuinsAround(0, 0, 8, 25);    // Bhuta Kala (Center)
+spawnRuinsAround(0, 40, 6, 20);   // Kuwera Punia
+spawnRuinsAround(-40, 0, 6, 20);  // Reog Ponorogo
 
 // MOON MESH (Visual Representation of Light Source)
 const moonGeom = new THREE.SphereGeometry(5, 32, 32);
