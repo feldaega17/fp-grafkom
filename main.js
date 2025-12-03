@@ -803,6 +803,8 @@ window.addEventListener("resize", () => {
 // =========================
 
 const clock = new THREE.Clock();
+const raycaster = new THREE.Raycaster();
+const downVector = new THREE.Vector3(0, -1, 0);
 
 function animate() {
   requestAnimationFrame(animate);
@@ -845,32 +847,34 @@ function animate() {
         playerState.velocity.z *= ratio;
     }
 
-    // Apply Movement
+    // Apply movement
     controls.moveRight(-playerState.velocity.x * delta);
     controls.moveForward(-playerState.velocity.z * delta);
+
+    // Gravity
+    playerState.velocity.y -= 9.8 * 2.0 * delta; // Gravity
     camera.position.y += playerState.velocity.y * delta;
 
-    // --- HEAD BOBBING ---
-    // Hanya bobbing jika bergerak di tanah
-    if (currentSpeed > 0.5 && camera.position.y <= playerState.defaultCameraY + 0.1) {
-        playerState.bobTimer += delta * 15; // Speed of bob
-        camera.position.y = Math.max(
-            2, // Min height
-            playerState.defaultCameraY + Math.sin(playerState.bobTimer) * 0.15
-        );
-    } else {
-        playerState.bobTimer = 0;
-        // Smooth return to default height
-        if (camera.position.y > 2 && camera.position.y < 3) {
-             camera.position.y = THREE.MathUtils.lerp(camera.position.y, playerState.defaultCameraY, delta * 5);
-        }
+    // Floor collision (Simple flat ground)
+    const groundHeight = 2;
+    if (camera.position.y < groundHeight) {
+      playerState.velocity.y = 0;
+      camera.position.y = groundHeight;
+      playerState.canJump = true;
     }
 
-    // Ground collision
-    if (camera.position.y < 2) {
-      playerState.velocity.y = 0;
-      camera.position.y = 2;
-      playerState.canJump = true;
+    // --- HEAD BOBBING ---
+    if (playerState.canJump) {
+        if (currentSpeed > 0.5) {
+            // Walking Bobbing
+            playerState.bobTimer += delta * 15; 
+            const bobOffset = Math.sin(playerState.bobTimer) * 0.1;
+            camera.position.y = groundHeight + Math.abs(bobOffset); 
+        } else {
+            // Idle - Reset height
+            playerState.bobTimer = 0;
+            camera.position.y = THREE.MathUtils.lerp(camera.position.y, groundHeight, delta * 10);
+        }
     }
 
     // Boundary check
