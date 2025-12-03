@@ -229,20 +229,20 @@ const textureLoader = new THREE.TextureLoader();
 
 // Procedural Grid Texture untuk tanah (Seamless & Natural)
 const canvas = document.createElement('canvas');
-canvas.width = 1024;
-canvas.height = 1024;
+canvas.width = 2048; // Increased resolution
+canvas.height = 2048;
 const context = canvas.getContext('2d');
 
 // 1. Base Layer (Dark Soil)
 context.fillStyle = '#1a1510'; 
-context.fillRect(0, 0, 1024, 1024);
+context.fillRect(0, 0, 2048, 2048);
 
 // Helper for seamless drawing
-function drawSeamlessSpot(x, y, radius) {
+function drawSeamlessSpot(x, y, radius, color) {
     const draw = (cx, cy) => {
         const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, radius);
-        gradient.addColorStop(0, 'rgba(40, 60, 40, 0.4)'); // Soft Greenish
-        gradient.addColorStop(1, 'rgba(40, 60, 40, 0)');
+        gradient.addColorStop(0, color); 
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
         context.fillStyle = gradient;
         context.beginPath();
         context.arc(cx, cy, radius, 0, Math.PI * 2);
@@ -251,37 +251,46 @@ function drawSeamlessSpot(x, y, radius) {
     
     // Draw center and wrapped versions
     draw(x, y);
-    draw(x + 1024, y);
-    draw(x - 1024, y);
-    draw(x, y + 1024);
-    draw(x, y - 1024);
-    draw(x + 1024, y + 1024);
-    draw(x - 1024, y - 1024);
-    draw(x + 1024, y - 1024);
-    draw(x - 1024, y + 1024);
+    draw(x + 2048, y);
+    draw(x - 2048, y);
+    draw(x, y + 2048);
+    draw(x, y - 2048);
+    draw(x + 2048, y + 2048);
+    draw(x - 2048, y - 2048);
+    draw(x + 2048, y - 2048);
+    draw(x - 2048, y + 2048);
 }
 
 // 2. Large Noise Patches (Grass/Moss) - Seamless
-for(let i=0; i<80; i++) { // More patches for better coverage
-    const x = Math.random() * 1024;
-    const y = Math.random() * 1024;
-    const radius = 100 + Math.random() * 150; // Larger patches
-    drawSeamlessSpot(x, y, radius);
+for(let i=0; i<150; i++) { 
+    const x = Math.random() * 2048;
+    const y = Math.random() * 2048;
+    const radius = 150 + Math.random() * 200; 
+    drawSeamlessSpot(x, y, radius, 'rgba(30, 50, 30, 0.3)'); // Dark Green
 }
 
-// 3. Small Noise (Dirt Detail)
-for(let i=0; i<150000; i++) {
+// 3. Medium Noise (Dry Earth)
+for(let i=0; i<200; i++) { 
+    const x = Math.random() * 2048;
+    const y = Math.random() * 2048;
+    const radius = 50 + Math.random() * 100; 
+    drawSeamlessSpot(x, y, radius, 'rgba(60, 40, 30, 0.2)'); // Brownish
+}
+
+// 4. Small Noise (Dirt Detail/Pebbles)
+for(let i=0; i<300000; i++) {
     context.fillStyle = Math.random() > 0.5 ? '#2a2015' : '#0f0a05';
-    context.fillRect(Math.random() * 1024, Math.random() * 1024, 2, 2);
+    const s = Math.random() * 3;
+    context.fillRect(Math.random() * 2048, Math.random() * 2048, s, s);
 }
 
 const groundTexture = new THREE.CanvasTexture(canvas);
 groundTexture.wrapS = THREE.RepeatWrapping;
 groundTexture.wrapT = THREE.RepeatWrapping;
-groundTexture.repeat.set(16, 16); // Reduced repeat to minimize tiling pattern visibility
+groundTexture.repeat.set(8, 8); // Adjusted repeat for larger texture
 
 // Ground - tanah luas
-const groundGeom = new THREE.PlaneGeometry(200, 200, 128, 128); // Lebih detail vertices
+const groundGeom = new THREE.PlaneGeometry(200, 200, 256, 256); // Lebih detail vertices (256x256)
 // Modifikasi vertices untuk uneven terrain (sedikit bergelombang)
 const posAttribute = groundGeom.attributes.position;
 for ( let i = 0; i < posAttribute.count; i ++ ) {
@@ -323,23 +332,46 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Jalan setapak (Improved Visuals - Grid System)
+// Jalan setapak (Improved Visuals - Stone Path)
 function createPath() {
-  // Texture untuk jalan (Dirt Road)
+  // Texture untuk jalan (Stone Paving)
   const pathCanvas = document.createElement('canvas');
-  pathCanvas.width = 512;
-  pathCanvas.height = 512;
+  pathCanvas.width = 1024;
+  pathCanvas.height = 1024;
   const pCtx = pathCanvas.getContext('2d');
   
-  // Base dirt color
-  pCtx.fillStyle = '#3e2b1f'; 
-  pCtx.fillRect(0, 0, 512, 512);
+  // Base dirt/grout color
+  pCtx.fillStyle = '#2b2b2b'; 
+  pCtx.fillRect(0, 0, 1024, 1024);
   
-  // Add noise/pebbles
-  for(let i=0; i<10000; i++) {
-      pCtx.fillStyle = Math.random() > 0.5 ? '#4a3728' : '#2a1a0a';
-      const s = Math.random() * 3;
-      pCtx.fillRect(Math.random() * 512, Math.random() * 512, s, s);
+  // Draw Stones
+  const stoneCount = 300;
+  for(let i=0; i<stoneCount; i++) {
+      const x = Math.random() * 1024;
+      const y = Math.random() * 1024;
+      const w = 40 + Math.random() * 60;
+      const h = 40 + Math.random() * 60;
+      
+      // Stone color variation
+      const shade = 50 + Math.floor(Math.random() * 50);
+      pCtx.fillStyle = `rgb(${shade}, ${shade}, ${shade})`;
+      
+      // Draw rounded rect (stone)
+      pCtx.beginPath();
+      pCtx.roundRect(x, y, w, h, 10);
+      pCtx.fill();
+      
+      // Add texture to stone
+      pCtx.fillStyle = 'rgba(0,0,0,0.1)';
+      for(let j=0; j<5; j++) {
+          pCtx.fillRect(x + Math.random()*w, y + Math.random()*h, 2, 2);
+      }
+  }
+  
+  // Add noise overlay
+  for(let i=0; i<50000; i++) {
+      pCtx.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)';
+      pCtx.fillRect(Math.random() * 1024, Math.random() * 1024, 2, 2);
   }
   
   const pathTexture = new THREE.CanvasTexture(pathCanvas);
@@ -474,23 +506,34 @@ function createGrass() {
 createGrass();
 
 // Pohon sederhana (Improved Procedural Tree with Bark Texture)
-// Generate Bark Texture
+// Generate Bark Texture (High Res)
 const barkCanvas = document.createElement('canvas');
-barkCanvas.width = 256;
-barkCanvas.height = 512;
+barkCanvas.width = 512;
+barkCanvas.height = 1024;
 const bCtx = barkCanvas.getContext('2d');
 bCtx.fillStyle = '#3e2723';
-bCtx.fillRect(0,0,256,512);
+bCtx.fillRect(0,0,512,1024);
 
-// Vertical streaks for bark
-for(let i=0; i<1000; i++) {
+// Vertical streaks for bark (Deep grooves)
+for(let i=0; i<3000; i++) {
     bCtx.fillStyle = Math.random() > 0.5 ? '#2d1b15' : '#4e342e';
-    const x = Math.random() * 256;
-    const y = Math.random() * 512;
-    const w = 2 + Math.random() * 4;
-    const h = 20 + Math.random() * 40;
+    const x = Math.random() * 512;
+    const y = Math.random() * 1024;
+    const w = 2 + Math.random() * 6;
+    const h = 30 + Math.random() * 80;
     bCtx.fillRect(x, y, w, h);
 }
+
+// Add horizontal cracks
+for(let i=0; i<500; i++) {
+    bCtx.fillStyle = '#1a100c';
+    const x = Math.random() * 512;
+    const y = Math.random() * 1024;
+    const w = 10 + Math.random() * 20;
+    const h = 2 + Math.random() * 2;
+    bCtx.fillRect(x, y, w, h);
+}
+
 const barkTexture = new THREE.CanvasTexture(barkCanvas);
 barkTexture.wrapS = THREE.RepeatWrapping;
 barkTexture.wrapT = THREE.RepeatWrapping;
@@ -581,6 +624,9 @@ function createTree(x, z) {
   scene.add(treeGroup);
 }
 
+// Store tree positions for falling leaves
+const treePositions = [];
+
 // Spawn pohon random
 for (let i = 0; i < 40; i++) { // Tambah jumlah pohon
   const x = (Math.random() - 0.5) * 160;
@@ -588,6 +634,7 @@ for (let i = 0; i < 40; i++) { // Tambah jumlah pohon
   // Hindari area tengah (jalan) - expanded exclusion zone
   if (Math.abs(x) > 15 && Math.abs(z) > 15) {
     createTree(x, z);
+    treePositions.push({x, z});
   }
 }
 
@@ -658,6 +705,7 @@ scene.add(moonMesh);
 
 const loader = new GLTFLoader();
 const ogohOgohList = [];
+const mixers = []; // Array untuk menyimpan animation mixer
 
 // 1. Load Bhuta Kala (Ogoh-ogoh Utama)
 function loadBhutaKala() {
@@ -677,6 +725,15 @@ function loadBhutaKala() {
         model.scale.set(5, 5, 5);
         model.rotation.y = 3 * Math.PI / 2; // Diputar 180 derajat dari posisi sebelumnya (90 -> 270)
         
+        // Check & Play Animation
+        if (gltf.animations && gltf.animations.length > 0) {
+            const mixer = new THREE.AnimationMixer(model);
+            const action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+            mixers.push(mixer);
+            console.log("Animation found for Bhuta Kala");
+        }
+
         model.traverse((child) => {
             if (child.isMesh) {
                 child.castShadow = true;
@@ -721,6 +778,15 @@ function loadKuwera() {
         model.scale.set(3, 3, 3); // Diperbesar dari 0.03 ke 5
         model.rotation.y = Math.PI; // Putar 180 derajat
         
+        // Check & Play Animation
+        if (gltf.animations && gltf.animations.length > 0) {
+            const mixer = new THREE.AnimationMixer(model);
+            const action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+            mixers.push(mixer);
+            console.log("Animation found for Kuwera");
+        }
+
         model.traverse((child) => {
             if (child.isMesh) {
                 child.castShadow = true;
@@ -771,6 +837,15 @@ function loadReog() {
         model.position.set(x, yPos, z);
         model.scale.set(10, 10, 10); // Diperbesar dari 3 ke 10
         
+        // Check & Play Animation
+        if (gltf.animations && gltf.animations.length > 0) {
+            const mixer = new THREE.AnimationMixer(model);
+            const action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+            mixers.push(mixer);
+            console.log("Animation found for Reog");
+        }
+
         model.traverse((child) => {
             if (child.isMesh) {
                 child.castShadow = true;
@@ -1016,7 +1091,8 @@ document.body.appendChild(dayNightBtn);
 
 function toggleDayNight() {
     const starField = scene.getObjectByName("starField");
-    const fireParticles = scene.getObjectByName("fireParticles"); // Ambient fire particles
+    // const fireParticles = scene.getObjectByName("fireParticles"); // Removed
+    const fireflies = scene.getObjectByName("fireflies"); // Kunang-kunang
     const modeText = document.getElementById("modeText");
 
     if (isNight) {
@@ -1048,7 +1124,8 @@ function toggleDayNight() {
 
         // Stars visible
         if(starField) starField.visible = true;
-        if(fireParticles) fireParticles.visible = true;
+        // if(fireParticles) fireParticles.visible = true;
+        if(fireflies) fireflies.visible = true;
         
         // Torches visible
         torchLights.forEach(l => l.visible = true);
@@ -1092,7 +1169,8 @@ function toggleDayNight() {
 
         // Stars invisible
         if(starField) starField.visible = false;
-        if(fireParticles) fireParticles.visible = false;
+        // if(fireParticles) fireParticles.visible = false;
+        if(fireflies) fireflies.visible = false;
         
         // Torches invisible
         torchLights.forEach(l => l.visible = false);
@@ -1159,42 +1237,76 @@ function checkProximity() {
 }
 
 // =========================
-// PARTICLE SYSTEM - API/ASAP
+// PARTICLE SYSTEM - KUNANG-KUNANG
 // =========================
 
-// const flameObjects = []; // Moved to top scope
+// Kunang-kunang (Fireflies)
+function createFireflies() {
+    const count = 150;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const phases = new Float32Array(count); // Untuk kedip-kedip
 
-function createFireParticles() {
-  const particleCount = 100; // Reduced untuk performance
-  const geometry = new THREE.BufferGeometry();
-  const positions = new Float32Array(particleCount * 3);
-  const colors = new Float32Array(particleCount * 3);
+    for(let i=0; i<count; i++) {
+        positions[i*3] = (Math.random() - 0.5) * 180;
+        positions[i*3+1] = 1 + Math.random() * 8; // Terbang rendah
+        positions[i*3+2] = (Math.random() - 0.5) * 180;
+        phases[i] = Math.random() * Math.PI * 2;
+    }
 
-  for (let i = 0; i < particleCount; i++) {
-    positions[i * 3] = (Math.random() - 0.5) * 200;
-    positions[i * 3 + 1] = Math.random() * 10;
-    positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('phase', new THREE.BufferAttribute(phases, 1));
 
-    colors[i * 3] = 1;
-    colors[i * 3 + 1] = Math.random() * 0.5;
-    colors[i * 3 + 2] = 0;
-  }
+    const material = new THREE.PointsMaterial({
+        color: 0xccff00, // Kuning kehijauan
+        size: 0.4,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
 
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-
-  const material = new THREE.PointsMaterial({
-    size: 0.3,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.6,
-  });
-
-  const particles = new THREE.Points(geometry, material);
-  particles.name = "fireParticles";
-  scene.add(particles);
+    const fireflies = new THREE.Points(geometry, material);
+    fireflies.name = "fireflies";
+    fireflies.visible = false; // Default hidden (Day mode)
+    scene.add(fireflies);
 }
-createFireParticles();
+createFireflies();
+
+// Daun Gugur (Falling Leaves)
+function createFallingLeaves() {
+    const count = 200; // Increased count for better effect under trees
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const speeds = new Float32Array(count);
+
+    for(let i=0; i<count; i++) {
+        // Pick random tree
+        const tree = treePositions[Math.floor(Math.random() * treePositions.length)];
+        const r = Math.random() * 4; // Radius around tree (canopy size)
+        const theta = Math.random() * Math.PI * 2;
+
+        positions[i*3] = tree.x + Math.cos(theta) * r;
+        positions[i*3+1] = 5 + Math.random() * 5; // Start height
+        positions[i*3+2] = tree.z + Math.sin(theta) * r;
+        speeds[i] = 0.5 + Math.random() * 1.5;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('speed', new THREE.BufferAttribute(speeds, 1));
+
+    const material = new THREE.PointsMaterial({
+        color: 0x2e7d32, // Hijau daun
+        size: 0.3,
+        transparent: true,
+        opacity: 0.8
+    });
+
+    const leaves = new THREE.Points(geometry, material);
+    leaves.name = "fallingLeaves";
+    scene.add(leaves);
+}
+createFallingLeaves();
 
 // =========================
 // RESPONSIVE
@@ -1220,6 +1332,9 @@ function animate() {
 
   const delta = clock.getDelta(); // Use Three.js clock for stable delta
   const time = clock.getElapsedTime();
+
+  // Update Mixers (Animations)
+  mixers.forEach(mixer => mixer.update(delta));
 
   if (controls.isLocked) {
     // Show UI elements
@@ -1311,17 +1426,46 @@ function animate() {
     dayNightBtn.style.display = "none";
   }
 
-  // Animate fire particles
-  const fireParticles = scene.getObjectByName("fireParticles");
-  if (fireParticles) {
-    const positions = fireParticles.geometry.attributes.position.array;
-    for (let i = 0; i < positions.length; i += 3) {
-      positions[i + 1] += delta * 2;
-      if (positions[i + 1] > 15) {
-        positions[i + 1] = 0;
+  // Animate Fireflies (Kunang-kunang)
+  const fireflies = scene.getObjectByName("fireflies");
+  if (fireflies && fireflies.visible) {
+      const positions = fireflies.geometry.attributes.position.array;
+      const phases = fireflies.geometry.attributes.phase.array;
+      
+      for(let i=0; i<phases.length; i++) {
+          // Gerakan naik turun & random
+          positions[i*3+1] += Math.sin(time * 2 + phases[i]) * 0.02;
+          positions[i*3] += Math.cos(time * 0.5 + phases[i]) * 0.02;
+          positions[i*3+2] += Math.sin(time * 0.5 + phases[i]) * 0.02;
+          
+          // Kedip-kedip (Opacity hack via scale or color if shader, but here simple movement)
       }
-    }
-    fireParticles.geometry.attributes.position.needsUpdate = true;
+      fireflies.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // Animate Falling Leaves
+  const leaves = scene.getObjectByName("fallingLeaves");
+  if (leaves) {
+      const positions = leaves.geometry.attributes.position.array;
+      const speeds = leaves.geometry.attributes.speed.array;
+      
+      for(let i=0; i<speeds.length; i++) {
+          positions[i*3+1] -= speeds[i] * delta; // Jatuh ke bawah
+          positions[i*3] += Math.sin(time + i) * 0.02; // Goyang kiri kanan
+          
+          // Reset jika sudah di tanah
+          if(positions[i*3+1] < 0) {
+              // Respawn at random tree
+              const tree = treePositions[Math.floor(Math.random() * treePositions.length)];
+              const r = Math.random() * 4;
+              const theta = Math.random() * Math.PI * 2;
+
+              positions[i*3] = tree.x + Math.cos(theta) * r;
+              positions[i*3+1] = 8 + Math.random() * 4; // Reset height
+              positions[i*3+2] = tree.z + Math.sin(theta) * r;
+          }
+      }
+      leaves.geometry.attributes.position.needsUpdate = true;
   }
 
   // Animate flames (Realistic Flicker & Sparks)
@@ -1371,9 +1515,9 @@ function animate() {
 
   // RENDER DENGAN POST-PROCESSING
   composer.render();
-
-  // RENDER DENGAN POST-PROCESSING
-  composer.render();
 }
+
+// Initialize Day/Night State
+toggleDayNight();
 
 animate();
