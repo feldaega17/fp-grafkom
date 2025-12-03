@@ -72,7 +72,10 @@ function checkHorizontalCollision(x, z, y) {
     const playerMaxX = x + playerRadius;
     const playerMinZ = z - playerRadius;
     const playerMaxZ = z + playerRadius;
-    const playerMinY = y + 0.2; // Lift slightly to avoid floor friction
+    
+    // Increased step-up tolerance (0.2 -> 0.5)
+    // Allows walking over small obstacles without jumping
+    const playerMinY = y + 0.5; 
     const playerMaxY = y + playerHeight;
 
     for (const box of worldColliders) {
@@ -1050,8 +1053,10 @@ for (let i = 0; i < 30; i++) {
       rockGeometries.push(rockGeom);
 
       // Add Collider for Rock
-      // Box size based on scale
-      addCollider(x, 0, z, scale * 2, scale * 1.5, scale * 2);
+      // Box size adjusted to match visual better (Wider but Shorter)
+      // Height reduced to avoid "invisible wall" above the rock
+      // Width increased to cover the edges so you don't slide off
+      addCollider(x, 0, z, scale * 2.5, scale * 1.1, scale * 2.5);
   }
 }
 
@@ -1565,7 +1570,7 @@ const playerState = {
   direction: new THREE.Vector3(),
   speed: 12, // Kecepatan jalan normal
   sprintSpeed: 25, // Kecepatan lari
-  jumpHeight: 10,
+  jumpHeight: 14, // Increased jump height for better platforming
   bobTimer: 0, // Untuk head bobbing
   defaultCameraY: 2 // Tinggi mata default
 };
