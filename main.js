@@ -495,43 +495,89 @@ const barkTexture = new THREE.CanvasTexture(barkCanvas);
 barkTexture.wrapS = THREE.RepeatWrapping;
 barkTexture.wrapT = THREE.RepeatWrapping;
 
+// Pohon Beringin (Banyan Tree) - Lebih cocok untuk tema Candi/Nusantara
 function createTree(x, z) {
   const treeGroup = new THREE.Group();
   treeGroup.position.set(x, 0, z);
 
-  // Trunk (Batang) - Lebih detail
-  const trunkGeom = new THREE.CylinderGeometry(0.4, 0.6, 4, 8);
+  // Randomize size slightly
+  const scale = 1 + Math.random() * 0.5;
+  treeGroup.scale.set(scale, scale, scale);
+
+  // 1. Batang Utama (Trunk) - Besar dan kokoh
+  const trunkGeom = new THREE.CylinderGeometry(1.2, 1.5, 5, 10);
   const trunkMat = new THREE.MeshStandardMaterial({ 
+      color: 0x4a3c31, // Dark wood color
       map: barkTexture,
-      roughness: 1.0,
+      roughness: 0.9,
       bumpMap: barkTexture,
-      bumpScale: 0.1
+      bumpScale: 0.2
   });
   const trunk = new THREE.Mesh(trunkGeom, trunkMat);
-  trunk.position.y = 2;
+  trunk.position.y = 2.5;
   trunk.castShadow = true;
   trunk.receiveShadow = true;
   treeGroup.add(trunk);
 
-  // Foliage (Daun) - Multiple layers of cones for pine-like look
+  // 2. Akar Gantung (Aerial Roots) - Ciri khas Beringin
+  const rootCount = 4 + Math.floor(Math.random() * 4);
+  for(let i=0; i<rootCount; i++) {
+      const rootGeom = new THREE.CylinderGeometry(0.1, 0.2, 4.5, 5);
+      const root = new THREE.Mesh(rootGeom, trunkMat);
+      
+      // Position around the trunk
+      const angle = (i / rootCount) * Math.PI * 2 + Math.random();
+      const dist = 1.0 + Math.random() * 0.5;
+      root.position.set(Math.cos(angle) * dist, 2.25, Math.sin(angle) * dist);
+      
+      // Miringkan sedikit agar terlihat natural
+      root.rotation.x = (Math.random() - 0.5) * 0.2;
+      root.rotation.z = (Math.random() - 0.5) * 0.2;
+      
+      root.castShadow = true;
+      treeGroup.add(root);
+  }
+
+  // 3. Dedaunan (Canopy) - Rimbun dan Melebar (Dome shape)
   const leavesMat = new THREE.MeshStandardMaterial({ 
-      color: 0x1b5e20,
+      color: 0x0f3d0f, // Darker green for banyan
       roughness: 0.8,
       side: THREE.DoubleSide
   });
 
-  const levels = 3;
-  for(let i=0; i<levels; i++) {
-      const size = 2.5 - (i * 0.5);
-      const yPos = 3.5 + (i * 1.5);
-      const leavesGeom = new THREE.ConeGeometry(size, 3, 8);
-      const leaves = new THREE.Mesh(leavesGeom, leavesMat);
-      leaves.position.y = yPos;
-      leaves.castShadow = true;
-      leaves.receiveShadow = true;
-      treeGroup.add(leaves);
+  // Buat beberapa sphere/dome untuk membentuk kanopi yang rimbun
+  const canopyGroup = new THREE.Group();
+  canopyGroup.position.y = 5;
+
+  // Main dome
+  const mainFoliage = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(3.5, 1),
+      leavesMat
+  );
+  mainFoliage.scale.y = 0.6; // Flatten slightly
+  mainFoliage.castShadow = true;
+  mainFoliage.receiveShadow = true;
+  canopyGroup.add(mainFoliage);
+
+  // Side clusters
+  const clusterCount = 6;
+  for(let i=0; i<clusterCount; i++) {
+      const cluster = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(2 + Math.random(), 0),
+          leavesMat
+      );
+      const angle = (i / clusterCount) * Math.PI * 2;
+      const dist = 2.5 + Math.random();
+      const yOffset = (Math.random() - 0.5) * 1.5;
+      
+      cluster.position.set(Math.cos(angle) * dist, yOffset, Math.sin(angle) * dist);
+      cluster.scale.y = 0.7;
+      cluster.castShadow = true;
+      cluster.receiveShadow = true;
+      canopyGroup.add(cluster);
   }
 
+  treeGroup.add(canopyGroup);
   scene.add(treeGroup);
 }
 
@@ -684,6 +730,13 @@ function loadKuwera() {
                 if (child.material) {
                     child.material.metalness = 0.0;
                     child.material.roughness = 0.8;
+                    
+                    // Brighten base color (Reset to white to ensure full texture brightness)
+                    if (child.material.color) child.material.color.setHex(0xffffff);
+                    
+                    // Reduce Ambient Occlusion if it's making it dirty/dark
+                    child.material.aoMapIntensity = 0.2;
+                    
                     child.material.needsUpdate = true;
                 }
             }
