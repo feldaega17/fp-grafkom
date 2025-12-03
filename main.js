@@ -121,50 +121,102 @@ moonLight.shadow.bias = -0.0005; // Mengurangi shadow acne
 scene.add(moonLight);
 
 // Torch lights (obor) - Warm Orange
-function createTorchLight(x, y, z) {
-  // PointLight untuk pencahayaan sekitar
-  const torchLight = new THREE.PointLight(0xff5500, 50, 25, 2); // High intensity for bloom
-  torchLight.position.set(x, y + 0.5, z);
-  torchLight.castShadow = true; // Enable shadow untuk realisme dramatis
-  torchLight.shadow.bias = -0.0001;
-  scene.add(torchLight);
+const torchLights = []; // Array untuk animasi cahaya obor
+const sparkParticles = []; // Array untuk partikel percikan api
 
-  // Visual obor
+function createTorchLight(x, y, z) {
+  // 1. PointLight (Cahaya Utama)
+  const torchLight = new THREE.PointLight(0xff6600, 80, 20, 2); // Lebih terang & radius pas
+  torchLight.position.set(x, y + 0.8, z);
+  torchLight.castShadow = true;
+  torchLight.shadow.bias = -0.0001;
+  torchLight.shadow.mapSize.width = 1024; // Optimasi shadow map
+  torchLight.shadow.mapSize.height = 1024;
+  scene.add(torchLight);
+  
+  // Simpan untuk animasi flicker
+  torchLight.userData = { baseIntensity: 80, phase: Math.random() * Math.PI * 2 };
+  torchLights.push(torchLight);
+
+  // 2. Visual Obor (Batang Kayu)
   const torchGeom = new THREE.CylinderGeometry(0.05, 0.08, 1.5, 8);
   const torchMat = new THREE.MeshStandardMaterial({ 
     color: 0x2a1a0a,
-    roughness: 0.9 
+    roughness: 1.0 
   });
   const torch = new THREE.Mesh(torchGeom, torchMat);
   torch.position.set(x, y - 0.75, z);
   torch.castShadow = true;
   scene.add(torch);
 
-  // Api (Core - Putih panas)
-  const fireCoreGeom = new THREE.SphereGeometry(0.15, 8, 8);
-  const fireCoreMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // Putih untuk pusat panas
-  const fireCore = new THREE.Mesh(fireCoreGeom, fireCoreMat);
-  fireCore.position.set(x, y + 0.2, z);
-  scene.add(fireCore);
+  // 3. Visual Api (Volumetric Layered Mesh)
+  const flameGroup = new THREE.Group();
+  flameGroup.position.set(x, y + 0.2, z);
+  
+  // Layer 1: Core (Putih Panas)
+  const coreGeom = new THREE.OctahedronGeometry(0.1, 2);
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const core = new THREE.Mesh(coreGeom, coreMat);
+  flameGroup.add(core);
 
-  // Api (Outer - Orange Glow)
-  const fireGeom = new THREE.SphereGeometry(0.25, 8, 8);
-  const fireMat = new THREE.MeshBasicMaterial({ 
-    color: 0xff4400,
-    transparent: true,
-    opacity: 0.8
+  // Layer 2: Inner Flame (Kuning/Oranye Terang)
+  const innerGeom = new THREE.OctahedronGeometry(0.2, 1);
+  const innerMat = new THREE.MeshBasicMaterial({ 
+      color: 0xffaa00, 
+      transparent: true, 
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending // Glowing effect
   });
-  const fire = new THREE.Mesh(fireGeom, fireMat);
-  fire.position.set(x, y + 0.3, z);
-  fire.userData.isFlame = true;
-  
-  // Randomize phase biar gak sinkron semua
-  fire.userData.phase = Math.random() * Math.PI * 2;
-  
-  scene.add(fire);
-  flameObjects.push(fire); 
+  const inner = new THREE.Mesh(innerGeom, innerMat);
+  flameGroup.add(inner);
 
-  return { light: torchLight, fire };
+  // Layer 3: Outer Flame (Merah/Oranye Gelap)
+  const outerGeom = new THREE.OctahedronGeometry(0.35, 0); // Low poly look for outer
+  const outerMat = new THREE.MeshBasicMaterial({ 
+      color: 0xff4400, 
+      transparent: true, 
+      opacity: 0.4,
+      blending: THREE.AdditiveBlending
+  });
+  const outer = new THREE.Mesh(outerGeom, outerMat);
+  flameGroup.add(outer);
+
+  scene.add(flameGroup);
+
+  // Simpan flame group untuk animasi
+  flameGroup.userData = { phase: Math.random() * Math.PI * 2 };
+  flameObjects.push({ group: flameGroup, core: core, inner: inner, outer: outer });
+
+  // 4. Spark System (Percikan Api Sederhana)
+  // Kita buat beberapa partikel kecil yang akan bergerak ke atas
+  for(let i=0; i<5; i++) {
+      const sparkGeom = new THREE.PlaneGeometry(0.05, 0.05);
+      const sparkMat = new THREE.MeshBasicMaterial({ 
+          color: 0xffaa00, 
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 1
+      });
+      const spark = new THREE.Mesh(sparkGeom, sparkMat);
+      
+      // Random start position near flame
+      resetSpark(spark, x, y, z);
+      
+      scene.add(spark);
+      sparkParticles.push({ mesh: spark, baseX: x, baseY: y, baseZ: z, speed: 0.5 + Math.random() * 1.0 });
+  }
+
+  return { light: torchLight, flameGroup };
+}
+
+function resetSpark(spark, x, y, z) {
+    spark.position.set(
+        x + (Math.random() - 0.5) * 0.3,
+        y + 0.2 + Math.random() * 0.5,
+        z + (Math.random() - 0.5) * 0.3
+    );
+    spark.scale.setScalar(1);
+    spark.material.opacity = 1;
 }
 
 // =========================
@@ -913,13 +965,44 @@ function animate() {
     fireParticles.geometry.attributes.position.needsUpdate = true;
   }
 
-  // Animate flames (Realistic Flicker)
-  flameObjects.forEach((flame) => {
-    // Gunakan phase unik tiap api biar gak barengan
-    const flicker = Math.sin(time * 10 + (flame.userData.phase || 0)) * 0.1 + 
-                    Math.cos(time * 20 + (flame.userData.phase || 0)) * 0.05;
-    flame.scale.setScalar(1 + flicker);
-    flame.material.opacity = 0.8 + flicker;
+  // Animate flames (Realistic Flicker & Sparks)
+  
+  // 1. Light Intensity Flicker
+  torchLights.forEach(light => {
+      const flicker = Math.sin(time * 20 + light.userData.phase) * 0.1 + Math.random() * 0.1;
+      light.intensity = light.userData.baseIntensity * (0.8 + flicker);
+  });
+
+  // 2. Flame Mesh Animation
+  flameObjects.forEach((obj) => {
+    const phase = obj.group.userData.phase;
+    
+    // Core: Stabil, sedikit berdenyut
+    const coreScale = 1.0 + Math.sin(time * 15 + phase) * 0.1;
+    obj.core.scale.setScalar(coreScale);
+
+    // Inner: Lebih liar
+    const innerScale = 1.0 + Math.sin(time * 20 + phase) * 0.2 + Math.cos(time * 10) * 0.1;
+    obj.inner.scale.set(innerScale, innerScale * 1.2, innerScale);
+    obj.inner.rotation.y += delta * 2;
+
+    // Outer: Paling liar dan transparan
+    const outerScale = 1.0 + Math.sin(time * 25 + phase) * 0.3;
+    obj.outer.scale.set(outerScale, outerScale * 1.5, outerScale);
+    obj.outer.rotation.y -= delta * 1.5;
+    obj.outer.material.opacity = 0.3 + Math.sin(time * 10) * 0.1;
+  });
+
+  // 3. Spark Particles Animation
+  sparkParticles.forEach(p => {
+      p.mesh.position.y += delta * p.speed;
+      p.mesh.rotation.z += delta * 2;
+      p.mesh.material.opacity -= delta * 0.8; // Fade out faster
+
+      // Reset if too high or invisible
+      if(p.mesh.position.y > p.baseY + 1.5 || p.mesh.material.opacity <= 0) {
+          resetSpark(p.mesh, p.baseX, p.baseY, p.baseZ);
+      }
   });
 
   // RENDER DENGAN POST-PROCESSING
