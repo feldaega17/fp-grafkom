@@ -728,6 +728,176 @@ for (let i = 0; i < 30; i++) { // Tambah jumlah batu
   }
 }
 
+// =========================
+// PUING-PUING CANDI (TEMPLE RUINS) - PROCEDURAL
+// =========================
+
+// Texture untuk reruntuhan (Ancient Stone with Moss)
+const ruinCanvas = document.createElement('canvas');
+ruinCanvas.width = 512;
+ruinCanvas.height = 512;
+const ruCtx = ruinCanvas.getContext('2d');
+
+// Base stone color
+ruCtx.fillStyle = '#5a5a5a';
+ruCtx.fillRect(0, 0, 512, 512);
+
+// Noise texture
+for(let i=0; i<10000; i++) {
+    ruCtx.fillStyle = Math.random() > 0.5 ? '#4a4a4a' : '#6a6a6a';
+    ruCtx.fillRect(Math.random()*512, Math.random()*512, 2, 2);
+}
+
+// Moss patches (Greenish overlay)
+for(let i=0; i<50; i++) {
+    const x = Math.random() * 512;
+    const y = Math.random() * 512;
+    const r = 20 + Math.random() * 40;
+    
+    const grad = ruCtx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, 'rgba(60, 80, 40, 0.6)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    
+    ruCtx.fillStyle = grad;
+    ruCtx.beginPath();
+    ruCtx.arc(x, y, r, 0, Math.PI*2);
+    ruCtx.fill();
+}
+
+const ruinTexture = new THREE.CanvasTexture(ruinCanvas);
+const ruinMat = new THREE.MeshStandardMaterial({
+    map: ruinTexture,
+    roughness: 0.9,
+    bumpMap: ruinTexture,
+    bumpScale: 0.15,
+    color: 0x888888
+});
+
+function createTempleRuins(x, z) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    
+    const type = Math.floor(Math.random() * 3); // 0: Pillar, 1: Wall, 2: Rubble
+    
+    if (type === 0) { // Broken Pillar
+        // Base
+        const baseGeom = new THREE.BoxGeometry(1.2, 0.4, 1.2);
+        const base = new THREE.Mesh(baseGeom, ruinMat);
+        base.position.y = 0.2;
+        base.castShadow = true;
+        base.receiveShadow = true;
+        group.add(base);
+        
+        // Pillar
+        const height = 1.0 + Math.random() * 2.0;
+        const pillarGeom = new THREE.CylinderGeometry(0.4, 0.4, height, 16);
+        const pillar = new THREE.Mesh(pillarGeom, ruinMat);
+        pillar.position.y = 0.4 + height / 2;
+        
+        // Tilt slightly if it's short (broken)
+        if (Math.random() > 0.5) {
+            pillar.rotation.z = (Math.random() - 0.5) * 0.2;
+            pillar.rotation.x = (Math.random() - 0.5) * 0.2;
+        }
+        
+        pillar.castShadow = true;
+        pillar.receiveShadow = true;
+        group.add(pillar);
+        
+        // Top debris (if broken)
+        if (Math.random() > 0.3) {
+             const debrisGeom = new THREE.DodecahedronGeometry(0.3, 0);
+             const debris = new THREE.Mesh(debrisGeom, ruinMat);
+             debris.position.set(0.5, 0.2, 0.5);
+             debris.castShadow = true;
+             debris.receiveShadow = true;
+             group.add(debris);
+        }
+        
+    } else if (type === 1) { // Collapsed Wall
+        const blockCount = 3 + Math.floor(Math.random() * 4);
+        for(let i=0; i<blockCount; i++) {
+            const w = 0.8 + Math.random() * 0.4;
+            const h = 0.4 + Math.random() * 0.2;
+            const d = 0.4 + Math.random() * 0.2;
+            const block = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), ruinMat);
+            
+            // Stack roughly
+            block.position.set(
+                (Math.random() - 0.5) * 0.5,
+                h/2 + i * (h - 0.05), // Overlap slightly
+                (Math.random() - 0.5) * 0.2
+            );
+            
+            // Rotate randomly
+            block.rotation.y = (Math.random() - 0.5) * 0.5;
+            block.rotation.z = (Math.random() - 0.5) * 0.1;
+            
+            block.castShadow = true;
+            block.receiveShadow = true;
+            group.add(block);
+        }
+        
+        // Fallen blocks
+        const fallenCount = 2;
+        for(let i=0; i<fallenCount; i++) {
+             const block = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.4), ruinMat);
+             block.position.set(
+                 1.0 + Math.random(),
+                 0.2,
+                 (Math.random() - 0.5) * 1.0
+             );
+             block.rotation.set(Math.random(), Math.random(), Math.random());
+             block.castShadow = true;
+             block.receiveShadow = true;
+             group.add(block);
+        }
+
+    } else { // Rubble Pile
+        const count = 5 + Math.floor(Math.random() * 5);
+        for(let i=0; i<count; i++) {
+            const size = 0.2 + Math.random() * 0.4;
+            const geom = Math.random() > 0.5 ? 
+                new THREE.DodecahedronGeometry(size, 0) : 
+                new THREE.BoxGeometry(size, size, size);
+            
+            const mesh = new THREE.Mesh(geom, ruinMat);
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * 1.5;
+            
+            mesh.position.set(
+                Math.cos(angle) * dist,
+                size/2,
+                Math.sin(angle) * dist
+            );
+            
+            mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            group.add(mesh);
+        }
+    }
+    
+    // Random rotation for the whole group
+    group.rotation.y = Math.random() * Math.PI * 2;
+    scene.add(group);
+}
+
+// Spawn Ruins
+for (let i = 0; i < 25; i++) {
+  const x = (Math.random() - 0.5) * 140;
+  const z = (Math.random() - 0.5) * 140;
+  
+  // Hindari area tengah (jalan)
+  const onMainCross = Math.abs(x) < 6 || Math.abs(z) < 6;
+  const onPathZ40 = Math.abs(z - 40) < 6;
+  const onPathXMin40 = Math.abs(x + 40) < 6;
+  
+  if (!onMainCross && !onPathZ40 && !onPathXMin40) {
+    createTempleRuins(x, z);
+  }
+}
+
 // MOON MESH (Visual Representation of Light Source)
 const moonGeom = new THREE.SphereGeometry(5, 32, 32);
 const moonMat = new THREE.MeshBasicMaterial({ color: 0xaaccff }); // Emissive look
