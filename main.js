@@ -1365,6 +1365,7 @@ const loader = new GLTFLoader(loadingManager);
 
 // Setup Draco Loader (Optional: Jika model dikompresi pakai Draco)
 const dracoLoader = new DRACOLoader();
+// Use a reliable CDN for Draco decoder
 dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 dracoLoader.setDecoderConfig({ type: 'js' });
 loader.setDRACOLoader(dracoLoader);
